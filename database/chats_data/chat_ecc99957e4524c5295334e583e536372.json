@@ -1,0 +1,21 @@
+{
+  "session_id": "ecc99957-e452-4c52-9533-4e583e536372",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Open YouTube for me"
+    },
+    {
+      "role": "assistant",
+      "content": "Opening YouTube for you, Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "What is price of USD?"
+    },
+    {
+      "role": "assistant",
+      "content": "The current USD exchange rate is approximately 1 USD = 90.73 Indian Rupees, Vinit Jangir."
+    }
+  ]
+}

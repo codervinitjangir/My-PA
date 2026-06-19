@@ -1,0 +1,21 @@
+{
+  "session_id": "5a982b0a-86b0-4519-b72d-5608cc43f4b4",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is this service?"
+    },
+    {
+      "role": "assistant",
+      "content": "This service appears to be image analysis, where a user uploads an image and asks questions about its contents. The image shows two people, with one holding up a pen."
+    },
+    {
+      "role": "user",
+      "content": "my pets birthday"
+    },
+    {
+      "role": "assistant",
+      "content": "Your pet Jonny's birthday is November 21, 2024, Boss."
+    }
+  ]
+}

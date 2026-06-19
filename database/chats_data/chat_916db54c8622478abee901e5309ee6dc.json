@@ -1,0 +1,45 @@
+{
+  "session_id": "916db54c-8622-478a-bee9-01e5309ee6dc",
+  "messages": [
+    {
+      "role": "user",
+      "content": "whats time"
+    },
+    {
+      "role": "assistant",
+      "content": "The current time is 12:35:09, Vinit Jangir, on Sunday, April 5, 2026."
+    },
+    {
+      "role": "user",
+      "content": "i want to go iskon Bengaluru from pst hostel brookfield"
+    },
+    {
+      "role": "assistant",
+      "content": "To get to ISKCON Bengaluru from PES Hostel in Brookfield, you can take a taxi or bus, Vinit Jangir. The distance is approximately 15-20 kilometers and may take around 30-40 minutes depending on traffic."
+    },
+    {
+      "role": "user",
+      "content": "from polaris school of technology hostel"
+    },
+    {
+      "role": "assistant",
+      "content": "To get to ISKCON Bengaluru from Polaris School of Technology hostel, you can take a taxi or bus, Vinit Jangir. The distance is around 10-15 kilometers and may take around 20-30 minutes depending on traffic."
+    },
+    {
+      "role": "user",
+      "content": "okie"
+    },
+    {
+      "role": "assistant",
+      "content": "I'll help you with directions or anything else you need, Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "okie i will tlk to you later"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Okie\" is a casual term that originated from \"Oll Korrect,\" a humorous misspelling of \"all correct,\" Vinit Jangir. It's often used to show friendly agreement or consent, similar to saying \"okay\" or \"alright.\""
+    }
+  ]
+}

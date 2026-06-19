@@ -1,0 +1,53 @@
+{
+  "session_id": "fff75adc-af63-45d5-91cf-d60a3641e70b",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, how are you?"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm doing well, Boss. How may I assist you today?"
+    },
+    {
+      "role": "user",
+      "content": "Sorry."
+    },
+    {
+      "role": "assistant",
+      "content": "No need to apologize, Boss. Is everything okay?"
+    },
+    {
+      "role": "user",
+      "content": "camera is visible or not"
+    },
+    {
+      "role": "assistant",
+      "content": "The camera is visible. The image shows a selfie of a man with dark hair, wearing a green shirt and black-framed glasses, indicating that the camera is capturing the scene."
+    },
+    {
+      "role": "user",
+      "content": "which phn is this"
+    },
+    {
+      "role": "assistant",
+      "content": "The phone is a Lava 5G. The brand name \"LAVA\" and the \"5G\" logo are visible on the back of the device."
+    },
+    {
+      "role": "user",
+      "content": "modal name of this phone"
+    },
+    {
+      "role": "assistant",
+      "content": "The phone model is Lava. The exact model name is not visible but the brand name \"LAVA\" is written in white letters on the top left corner of the phone."
+    },
+    {
+      "role": "user",
+      "content": "serch on internet and tell me"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm not capable of searching the internet. The image shows a young man with dark hair and glasses wearing a green shirt and headphones around his neck sitting on a wooden chair or bench. A framed picture hangs on the wall behind him."
+    }
+  ]
+}

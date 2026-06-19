@@ -1,0 +1,13 @@
+{
+  "session_id": "4162dae2-e6da-473a-bfed-18080d110e0e",
+  "messages": [
+    {
+      "role": "user",
+      "content": "whats doller price?"
+    },
+    {
+      "role": "assistant",
+      "content": "The current US dollar exchange rate is around 90.49 Indian Rupees per USD, according to recent data."
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "session_id": "e1818960-71e9-4df6-b91d-f23c6c960c8e",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi jarvis how are you and whats time now"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm doing well, Boss. The current time is 06:15 PM on Sunday, April 26, 2026."
+    }
+  ]
+}

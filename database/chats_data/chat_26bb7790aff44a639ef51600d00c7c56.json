@@ -1,0 +1,21 @@
+{
+  "session_id": "26bb7790-aff4-4a63-9ef5-1600d00c7c56",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi how are you"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm doing well, thanks for asking. You appear to be reclining with your head resting on a pillow, wearing a white shirt and black-framed glasses."
+    },
+    {
+      "role": "user",
+      "content": "can I flip camera"
+    },
+    {
+      "role": "assistant",
+      "content": "No you can't flip the camera. The image appears to be a selfie with you in it, likely taken with the camera on your phone or computer."
+    }
+  ]
+}

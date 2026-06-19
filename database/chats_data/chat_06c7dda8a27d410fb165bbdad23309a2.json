@@ -1,0 +1,13 @@
+{
+  "session_id": "06c7dda8-a27d-410f-b165-bbdad23309a2",
+  "messages": [
+    {
+      "role": "user",
+      "content": "what is 2+2?"
+    },
+    {
+      "role": "assistant",
+      "content": "The answer is 4, Vinit Jangir."
+    }
+  ]
+}

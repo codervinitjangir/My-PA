@@ -1,0 +1,29 @@
+{
+  "session_id": "917041e8-5e57-4b62-838b-0f54e283f6fa",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello Jarvis, Open WhatsApp and text others good morning."
+    },
+    {
+      "role": "assistant",
+      "content": "I'm opening WhatsApp for you. I'll send a \"good morning\" message to your contacts."
+    },
+    {
+      "role": "user",
+      "content": "Tell me price of a Bitcoin."
+    },
+    {
+      "role": "assistant",
+      "content": "The current price of Bitcoin is $64,316.68 USD, Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "OK, Jarvis, what's my pet name?"
+    },
+    {
+      "role": "assistant",
+      "content": "Your pet's name is Jonny, Boss, and he's a dog."
+    }
+  ]
+}

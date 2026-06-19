@@ -1,0 +1,13 @@
+{
+  "session_id": "ecf3d3df-e242-45a9-96b8-640189106cdc",
+  "messages": [
+    {
+      "role": "user",
+      "content": "whats doller price?"
+    },
+    {
+      "role": "assistant",
+      "content": "The current dollar price is approximately 82.75 INR per USD, as of 20:18:02 on Tuesday, February 10, 2026."
+    }
+  ]
+}

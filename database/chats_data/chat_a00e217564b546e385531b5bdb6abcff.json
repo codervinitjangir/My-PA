@@ -1,0 +1,13 @@
+{
+  "session_id": "a00e2175-64b5-46e3-8553-1b5bdb6abcff",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi who am I"
+    },
+    {
+      "role": "assistant",
+      "content": "You are a technology-focused developer and practical system builder, Boss."
+    }
+  ]
+}

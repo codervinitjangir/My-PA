@@ -1,0 +1,85 @@
+{
+  "session_id": "68d2ad7b-f8d5-46af-80f8-5af0ccd52cbb",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi"
+    },
+    {
+      "role": "assistant",
+      "content": "Good evening, Vinit Jangir. How may I assist you today?"
+    },
+    {
+      "role": "user",
+      "content": "can you call me boss at palace of vinit jangir"
+    },
+    {
+      "role": "assistant",
+      "content": "I can address you as Boss, as we are now at the Palace of Vinit Jangir. Hello, Boss."
+    },
+    {
+      "role": "user",
+      "content": "how are you?"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm doing well, Boss. I'm ready to assist you with anything you need at the Palace of Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "tell my my pet name?"
+    },
+    {
+      "role": "assistant",
+      "content": "Your pet's name is Jonny, Boss, and he's a dog."
+    },
+    {
+      "role": "user",
+      "content": "oo you rember"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes, Boss, I remember that your dog's name is Jonny and his birth date is 21 November 2024."
+    },
+    {
+      "role": "user",
+      "content": "you know about lord rama"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes, Boss, I'm familiar with Lord Rama, a major deity in Hinduism and the protagonist of the epic Ramayana. He's known for his righteousness, courage, and devotion to his duties."
+    },
+    {
+      "role": "user",
+      "content": "you know about lord rama"
+    },
+    {
+      "role": "assistant",
+      "content": "Lord Rama, Boss, is the seventh avatar of the god Vishnu, and his life and ideals are depicted in the Hindu epic Ramayana. He's revered for his unwavering commitment to duty, honor, and loyalty, and is often considered a symbol of righteousness and virtue."
+    },
+    {
+      "role": "user",
+      "content": "in some deep"
+    },
+    {
+      "role": "assistant",
+      "content": "Lord Rama, Boss, represents the embodiment of dharma, righteousness, and moral integrity, serving as a spiritual guide in Hindu mythology, and his life story teaches devotion, leadership, and adherence to ethical principles, inspiring spiritual growth and moral conduct."
+    },
+    {
+      "role": "user",
+      "content": "okie byy good night"
+    },
+    {
+      "role": "assistant",
+      "content": "Good night, Boss, may you have a restful and peaceful night at the Palace of Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "whats my name?"
+    },
+    {
+      "role": "assistant",
+      "content": "Your name is Vinit Jangir, Boss."
+    }
+  ]
+}

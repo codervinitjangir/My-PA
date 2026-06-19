@@ -1,0 +1,21 @@
+{
+  "session_id": "be56067c-8e63-4914-8671-1ddec4597130",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi how are you"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm doing well, Vinit Jangir. How may I assist you today?"
+    },
+    {
+      "role": "user",
+      "content": "I am fine. Tell me a thing about me."
+    },
+    {
+      "role": "assistant",
+      "content": "You're a technology-focused developer and practical system builder, Vinit Jangir, with a strong interest in real-world projects and open-source development."
+    }
+  ]
+}

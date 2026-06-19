@@ -1,0 +1,29 @@
+{
+  "session_id": "3829dcf3-0c3d-48b9-bc49-93a25e2c7884",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hi, Jarvis."
+    },
+    {
+      "role": "assistant",
+      "content": ""
+    },
+    {
+      "role": "user",
+      "content": "hi"
+    },
+    {
+      "role": "assistant",
+      "content": ""
+    },
+    {
+      "role": "user",
+      "content": "hi"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello, Boss, how can I help you today?"
+    }
+  ]
+}

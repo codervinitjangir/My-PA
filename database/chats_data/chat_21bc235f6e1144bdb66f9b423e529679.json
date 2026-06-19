@@ -1,0 +1,21 @@
+{
+  "session_id": "21bc235f-6e11-44bd-b66f-9b423e529679",
+  "messages": [
+    {
+      "role": "user",
+      "content": "i will talk to you later"
+    },
+    {
+      "role": "assistant",
+      "content": "It was nice chatting with you, Boss. I'll be here when you're ready to talk again."
+    },
+    {
+      "role": "user",
+      "content": "It was nice chatting with you boss."
+    },
+    {
+      "role": "assistant",
+      "content": "I think there's been a mix-up, Boss - you're the one I should be addressing as Boss, not the other way around. Have a great day and I'll talk to you later."
+    }
+  ]
+}

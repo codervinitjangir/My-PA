@@ -1,0 +1,61 @@
+{
+  "session_id": "fc4dab51-2ae2-4501-9fea-8f8331b990dc",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Tell me a fun fact"
+    },
+    {
+      "role": "assistant",
+      "content": "Vinit Jangir, did you know that there is a species of jellyfish that is immortal, the Turritopsis dohrnii, also known as the \"immortal jellyfish\"? It can transform its body into a younger state through a process called transdifferentiation."
+    },
+    {
+      "role": "user",
+      "content": "What's price of Bitcoin?"
+    },
+    {
+      "role": "assistant",
+      "content": "The current price of Bitcoin is $65,324.73 USD, Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "Or Batau to Marika Hale."
+    },
+    {
+      "role": "assistant",
+      "content": "I'm not aware of any information about a place called Batau or Marika Hale, Vinit Jangir. Could you provide more context or details about these locations?"
+    },
+    {
+      "role": "user",
+      "content": "Can you hear language English or Hindi?"
+    },
+    {
+      "role": "assistant",
+      "content": "I can understand and respond to both English and Hindi, Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "Say a sentence in Hindi."
+    },
+    {
+      "role": "assistant",
+      "content": "Main aapki madad karne ke liye yahaan hoon, Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "What is my name?"
+    },
+    {
+      "role": "assistant",
+      "content": "Your name is Vinit Jangir."
+    },
+    {
+      "role": "user",
+      "content": "My e-mail ID."
+    },
+    {
+      "role": "assistant",
+      "content": "Your email address is vinitjangirr@gmail.com, Vinit Jangir."
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "session_id": "f4464af4-c2b3-45a2-8567-163a1825668d",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi Jarvis kaise ho"
+    },
+    {
+      "role": "assistant",
+      "content": "Main theek hoon, Boss. Aap kaise hain, kya main aapki kisi madad kar sakta hoon?"
+    },
+    {
+      "role": "user",
+      "content": "Jarvis how are you can you able to hear me"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm doing well, Boss. Yes, I can hear you, and I'm ready to help with anything you need."
+    },
+    {
+      "role": "user",
+      "content": "jarvis can you see this"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes I can see this. The image shows a hand holding a black smartphone with a woven case, positioned in front of a white wall. The phone's camera lenses are visible at the bottom left corner."
+    },
+    {
+      "role": "user",
+      "content": "which one is this"
+    },
+    {
+      "role": "assistant",
+      "content": "The object you are holding is an iPhone. It is a light blue iPhone with dual cameras in the bottom right corner and an Apple logo centered on the back."
+    },
+    {
+      "role": "user",
+      "content": "okay tell me something"
+    },
+    {
+      "role": "assistant",
+      "content": "The Turritopsis dohrnii, also known as the \"immortal jellyfish\", is a species of jellyfish that is biologically immortal, Boss."
+    },
+    {
+      "role": "user",
+      "content": "okay good night"
+    },
+    {
+      "role": "assistant",
+      "content": "Good night, Boss, I'll be here when you're ready to talk again."
+    },
+    {
+      "role": "user",
+      "content": "Hlo"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello, Boss, how can I help you today?"
+    }
+  ]
+}

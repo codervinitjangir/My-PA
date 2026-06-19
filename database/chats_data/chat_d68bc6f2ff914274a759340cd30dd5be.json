@@ -1,0 +1,21 @@
+{
+  "session_id": "d68bc6f2-ff91-4274-a759-340cd30dd5be",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What can you do?"
+    },
+    {
+      "role": "assistant",
+      "content": "I can answer questions, open websites and apps, play music and videos, generate images, write content, and analyze camera images, Boss. I can also search Google and YouTube for you."
+    },
+    {
+      "role": "user",
+      "content": "open youtube for me"
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened YouTube for you."
+    }
+  ]
+}
