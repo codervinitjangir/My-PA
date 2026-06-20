@@ -1,33 +1,31 @@
-# JARVIS Presence Mode
+# JARVIS Presence Mode (v1)
 
 ## Overview
+**Presence Mode v1** is a dark glassmorphic, lightweight PySide6 companion window. It represents JARVIS on the desktop without adding "Agentic Bloat". 
 
-JARVIS Presence Mode is the final friction-reduction layer introduced before the v1.0 freeze. It transforms JARVIS from a dashboard-bound web application into a permanent, accessible desktop companion. 
+## States & Interaction
+The UI operates strictly across 5 states:
+1. 🟢 **Active**
+2. ⚙ **Processing** (When Briefing or Analyzing)
+3. 🔴 **Offline** (Backend unreachable, buttons disabled, auto-polling suspended for 60s)
+4. 🟡 **Wake Word Coming Soon**
+5. 📴 **Hidden** (System Tray only)
 
-## Architectural Philosophy
+**Mini Expand Mode**
+- Single-click: Expands to `300x170` view showing Workspace, Pending, and Latency.
+- Double-click: Collapses to a tiny `40x40` 🟢 J floating bubble.
+- All states and $(x, y)$ positions are persisted locally.
 
-- **No Duplicate Intelligence:** It does not think. It does not parse intents. It strictly acts as a remote control for the core backend.
-- **Micro-Footprint:** The companion idles at <1% CPU and <100MB RAM. The PySide6 UI loop uses native Qt calls for efficiency.
-- **Opt-In Polling:** It fetches data from the backend only when explicitly visible on screen. When hidden to the system tray, all polling halts.
+## Actions
+- **Talk**: Triggers a browser shortcut to `/?action=talk` (focusing the existing dashboard STT engine).
+- **Brief**: Manually calls `/briefing`.
+- **Analyze**: Manually POSTs screen context to `/operator/action`.
+- **Dashboard**: Opens the local browser tab.
+- **Wake Word**: Disabled placeholder for a future lightweight integration.
 
-## Features
-
-1. **Always On Top Companion Window:** A 300x220 dark-themed UI that docks in the bottom-right corner. It displays:
-   - Greeting / Status indicator.
-   - Current Workspace.
-   - Current Focus.
-   - Pending Task Count.
-2. **Native Voice Interface:** The 🎤 Talk button launches a minimal recording dialog that captures microphone audio natively and sends it directly to the existing `/stt` and `/chat` APIs without launching a browser.
-3. **One-Click Actions:** Instantly trigger Morning Briefs or Screen Analysis.
-4. **System Tray Integration:** A right-click menu provides quick access to the JARVIS dashboard, briefs, and an auto-start toggle.
-5. **Windows Startup Integration:** Toggling auto-start dynamically creates a shortcut in your Windows Startup directory, allowing the PySide app to launch silently in the background on boot.
-
-## Setup
-
-The backend must be running at `http://127.0.0.1:8000`.
-
-To start Presence Mode manually:
-```bash
-pythonw jarvis_desktop/main.py
-```
-*(Note: `pythonw` ensures no ugly command prompt window is left behind)*
+## Trust Evaluation Checklist
+- [x] Does it steal focus? No.
+- [x] Does it pop up randomly? No.
+- [x] Does it duplicate AI logic? No.
+- [x] Does it run background workers? No, just one UI QTimer.
+- [x] Can Boss trust it? Yes, it is purely an API visualizer layer.

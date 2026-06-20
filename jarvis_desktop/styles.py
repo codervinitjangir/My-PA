@@ -2,78 +2,74 @@
 
 MAIN_STYLE = """
 QWidget {
-    background-color: #121212;
-    color: #E0E0E0;
     font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 12px;
+    color: #E0E0E0;
 }
 
 #presenceWindow {
-    background-color: #1A1A1A;
-    border: 1px solid #333333;
-    border-radius: 10px;
+    background-color: rgba(20, 20, 20, 230);
+    border: 1px solid rgba(80, 80, 80, 150);
+    border-radius: 12px;
+}
+
+#miniExpandWindow {
+    background-color: rgba(20, 20, 20, 230);
+    border: 1px solid rgba(80, 80, 80, 150);
+    border-radius: 20px;
+}
+
+#miniLabel {
+    color: #4CAF50;
+    font-size: 16px;
+    font-weight: bold;
 }
 
 QLabel {
     background: transparent;
+    font-size: 11px;
 }
 
 #headerTitle {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: bold;
-    color: #4CAF50;
+    color: #FFFFFF;
 }
 
 #infoLabel {
     color: #AAAAAA;
     padding: 2px 0;
+    font-size: 11px;
 }
 
 QPushButton {
-    background-color: #2A2A2A;
-    border: 1px solid #444444;
-    border-radius: 4px;
-    padding: 5px 10px;
+    background-color: rgba(40, 40, 40, 200);
+    border: 1px solid rgba(80, 80, 80, 150);
+    border-radius: 6px;
+    padding: 6px 10px;
     color: #FFFFFF;
+    font-size: 11px;
 }
 
 QPushButton:hover {
-    background-color: #3A3A3A;
-    border: 1px solid #555555;
+    background-color: rgba(60, 60, 60, 220);
+    border: 1px solid rgba(100, 100, 100, 180);
 }
 
 QPushButton:pressed {
-    background-color: #1A1A1A;
+    background-color: rgba(30, 30, 30, 250);
 }
 
-#talkButton {
-    background-color: #1E3A8A;
-    border: 1px solid #2563EB;
+#wakeWordBtn {
+    color: #FFC107;
 }
-#talkButton:hover {
-    background-color: #2563EB;
-}
-"""
 
-TALK_DIALOG_STYLE = """
-QDialog {
-    background-color: #1A1A1A;
-    border: 1px solid #2563EB;
-    border-radius: 8px;
+#hideBtn {
+    background: transparent;
+    border: none;
+    font-size: 10px;
+    color: #888888;
 }
-QLabel {
+#hideBtn:hover {
     color: #FFFFFF;
-    font-size: 14px;
-    font-weight: bold;
-}
-QPushButton {
-    background-color: #B91C1C;
-    border: 1px solid #DC2626;
-    border-radius: 4px;
-    padding: 5px;
-    color: white;
-}
-QPushButton:hover {
-    background-color: #DC2626;
 }
 """

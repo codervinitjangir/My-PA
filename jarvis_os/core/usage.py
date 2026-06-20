@@ -14,6 +14,12 @@ _DEFAULT: Dict[str, Any] = {
     "web_open": 0,
     "web_search": 0,
     "web_summarize": 0,
+    "presence_open": 0,
+    "presence_hide": 0,
+    "presence_brief": 0,
+    "presence_dashboard": 0,
+    "presence_analyze": 0,
+    "presence_voice": 0,
     "quick_links": {},
     "daily_history": {},
 }
