@@ -1,28 +1,37 @@
 {
-  "dashboard_open": 3,
-  "morning_brief": 0,
-  "screen_analysis": 0,
+  "dashboard_open": 79,
+  "morning_brief": 9,
+  "screen_analysis": 6,
   "session_resume": 0,
   "browser_open": 0,
   "quick_links": {},
   "daily_history": {
     "2026-06-20": {
-      "dashboard_open": 3,
-      "presence_open": 2
+      "dashboard_open": 79,
+      "presence_open": 11,
+      "presence_voice": 6,
+      "presence_brief": 12,
+      "presence_analyze": 11,
+      "presence_hide": 3,
+      "wake_toggle_on": 5,
+      "morning_brief": 9,
+      "screen_analysis": 6,
+      "presence_dashboard": 5,
+      "wake_toggle_off": 4
     }
   },
   "web_open": 0,
   "web_search": 0,
   "web_summarize": 0,
-  "presence_open": 2,
-  "presence_hide": 0,
-  "presence_brief": 0,
-  "presence_dashboard": 0,
-  "presence_analyze": 0,
-  "presence_voice": 0,
+  "presence_open": 11,
+  "presence_hide": 3,
+  "presence_brief": 12,
+  "presence_dashboard": 5,
+  "presence_analyze": 11,
+  "presence_voice": 6,
   "wake_detected": 0,
   "wake_command_executed": 0,
   "wake_timeout": 0,
-  "wake_toggle_on": 0,
-  "wake_toggle_off": 0
+  "wake_toggle_on": 5,
+  "wake_toggle_off": 4
 }

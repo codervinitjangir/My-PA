@@ -1,7 +1,8 @@
 import json
 import time
+import threading
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 _USAGE_FILE = Path(__file__).parent / "usage_log.json"
 
@@ -29,24 +30,62 @@ _DEFAULT: Dict[str, Any] = {
     "daily_history": {},
 }
 
+# ── In-memory cache: one load from disk, batch writes every 60 seconds ────────
+_cache: Optional[Dict[str, Any]] = None
+_cache_lock = threading.Lock()
+_last_save_time: float = 0.0
+_FLUSH_INTERVAL = 60.0  # seconds
+
 
 def _load() -> Dict[str, Any]:
-    if not _USAGE_FILE.exists():
-        _USAGE_FILE.write_text(json.dumps(_DEFAULT, indent=2), encoding="utf-8")
-        return dict(_DEFAULT)
-    try:
-        data = json.loads(_USAGE_FILE.read_text(encoding="utf-8"))
-        # Back-fill missing keys
-        for k, v in _DEFAULT.items():
-            if k not in data:
-                data[k] = v
-        return data
-    except (json.JSONDecodeError, OSError):
-        return dict(_DEFAULT)
+    global _cache
+    with _cache_lock:
+        if _cache is not None:
+            return _cache
+        # First call: load from disk
+        if not _USAGE_FILE.exists():
+            _USAGE_FILE.write_text(json.dumps(_DEFAULT, indent=2), encoding="utf-8")
+            _cache = dict(_DEFAULT)
+            return _cache
+        try:
+            data = json.loads(_USAGE_FILE.read_text(encoding="utf-8"))
+            # Back-fill missing keys
+            for k, v in _DEFAULT.items():
+                if k not in data:
+                    data[k] = v
+            _cache = data
+            return _cache
+        except (json.JSONDecodeError, OSError):
+            _cache = dict(_DEFAULT)
+            return _cache
 
 
 def _save(data: Dict[str, Any]) -> None:
-    _USAGE_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    """Update in-memory cache. Flush to disk at most every 60 seconds."""
+    global _cache, _last_save_time
+    with _cache_lock:
+        _cache = data
+        now = time.time()
+        if now - _last_save_time >= _FLUSH_INTERVAL:
+            _flush_unlocked(data)
+            _last_save_time = now
+
+
+def _flush_unlocked(data: Dict[str, Any]) -> None:
+    """Write to disk. Caller must hold _cache_lock."""
+    try:
+        _USAGE_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def flush_usage() -> None:
+    """Force immediate disk write. Call on server shutdown."""
+    global _last_save_time
+    with _cache_lock:
+        if _cache:
+            _flush_unlocked(_cache)
+            _last_save_time = time.time()
 
 
 def _today() -> str:

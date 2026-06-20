@@ -1,0 +1,13 @@
+{
+  "session_id": "39e533de-19d7-47db-8706-3b191e6524ab",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Analyze my screen"
+    },
+    {
+      "role": "assistant",
+      "content": "The image shows a screenshot of a computer screen with a dark interface. \n\nThe screen displays a dashboard with a greeting \"Good Evening Boss\" and system information, including CPU usage at 15%, RAM usage at 45%, and an active project titled \"Jarvis OS Refactor\". \n\nThe taskbar at the bottom shows the time as 8:27 PM on June 20."
+    }
+  ]
+}

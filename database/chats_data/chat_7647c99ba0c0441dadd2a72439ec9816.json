@@ -1,0 +1,69 @@
+{
+  "session_id": "7647c99b-a0c0-441d-add2-a72439ec9816",
+  "messages": [
+    {
+      "role": "user",
+      "content": "can you play tere naam song on youtube?"
+    },
+    {
+      "role": "assistant",
+      "content": "I've started playing that for you."
+    },
+    {
+      "role": "user",
+      "content": "play 1st one song on youtube screen"
+    },
+    {
+      "role": "assistant",
+      "content": "I've started playing that for you."
+    },
+    {
+      "role": "user",
+      "content": "1st one that showing on screen?"
+    },
+    {
+      "role": "assistant",
+      "content": "Please open the webcam or attach an image so I can see what you're referring to."
+    },
+    {
+      "role": "user",
+      "content": "not in camera, but on laptop screen"
+    },
+    {
+      "role": "assistant",
+      "content": "Please open the webcam or attach an image so I can see what you're referring to."
+    },
+    {
+      "role": "user",
+      "content": "Hi Jarvis Hi Jarvis Hello Jarvis Hello Hello"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello, Boss. How may I assist you today?"
+    },
+    {
+      "role": "user",
+      "content": "What's my name?"
+    },
+    {
+      "role": "assistant",
+      "content": "Your name is Vinit Jangir, Boss."
+    },
+    {
+      "role": "user",
+      "content": "can you open pictures for"
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened Pictures for you."
+    },
+    {
+      "role": "user",
+      "content": "can you open pictures for"
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened Pictures for you."
+    }
+  ]
+}

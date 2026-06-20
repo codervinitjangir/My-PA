@@ -1,0 +1,21 @@
+{
+  "session_id": "01ad1b91-f2ee-42b2-a41c-22b62d607562",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Jarvis, what it is?"
+    },
+    {
+      "role": "assistant",
+      "content": "It is a white Realme wireless earbud case. The case has a gray line across the middle and the brand name \"realme\" printed on it."
+    },
+    {
+      "role": "user",
+      "content": "Hello, what day"
+    },
+    {
+      "role": "assistant",
+      "content": "It's Saturday, Boss."
+    }
+  ]
+}

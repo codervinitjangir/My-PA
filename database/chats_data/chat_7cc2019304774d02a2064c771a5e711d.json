@@ -1,0 +1,45 @@
+{
+  "session_id": "7cc20193-0477-4d02-a206-4c771a5e711d",
+  "messages": [
+    {
+      "role": "user",
+      "content": "जार्विश जार्विश"
+    },
+    {
+      "role": "assistant",
+      "content": "हाँ, बॉस, मैं यहाँ हूँ। क्या आपको किसी चीज़ की आवश्यकता है?"
+    },
+    {
+      "role": "user",
+      "content": "Continue Previous Session"
+    },
+    {
+      "role": "assistant",
+      "content": "पिछली बातचीत को फिर से शुरू करने के लिए तैयार हूँ, बॉस। हम जॉनी के बारे में बात कर रहे थे, आपके कुत्ते के बारे में।"
+    },
+    {
+      "role": "user",
+      "content": "Open VS Code"
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened Code for you."
+    },
+    {
+      "role": "user",
+      "content": "Continue Jarvis"
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened Code for you."
+    },
+    {
+      "role": "user",
+      "content": "Tell me a joke."
+    },
+    {
+      "role": "assistant",
+      "content": "बॉस, क्योंकि आप एक डेवलपर हैं, तो यह जोक आपके लिए है: क्या आप जानते हैं कि कंप्यूटर ने डॉक्टर से क्या कहा? यह मुझे वायरस हो गया है!"
+    }
+  ]
+}

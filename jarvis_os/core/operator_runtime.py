@@ -1,7 +1,7 @@
 import logging
 import time
 import json
-from jarvis_os.core.global_state import build_global_state
+from jarvis_os.core.state_manager import GlobalStateManager
 from jarvis_os.operator.operator_router import OperatorRouter
 
 logger = logging.getLogger("J.A.R.V.I.S")
@@ -10,6 +10,8 @@ class OperatorRuntime:
     def __init__(self, groq_service):
         self.groq_service = groq_service
         self.router = OperatorRouter()
+        self._state_mgr = GlobalStateManager()
+
 
     def process_user_request(self, session_id: str, message: str) -> str:
         """
@@ -20,7 +22,7 @@ class OperatorRuntime:
         logger.info(f"[OPERATOR] Received input | Session: {session_id[:8]} | Message: {message[:50]}")
         
         # 1. Collect global state
-        global_state = build_global_state()
+        global_state = self._state_mgr.build_global_state()
         state_str = json.dumps(global_state, indent=2)
         
         # 2. Call capability router

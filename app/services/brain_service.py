@@ -339,8 +339,30 @@ class BrainService:
 
         return intents
 
+    NATIVE_APPS = {
+        "notepad": "notepad.exe",
+        "calculator": "calc.exe",
+        "calc": "calc.exe",
+        "cmd": "cmd.exe",
+        "command prompt": "cmd.exe",
+        "powershell": "powershell.exe",
+        "explorer": "explorer.exe",
+        "file explorer": "explorer.exe",
+        "vs code": "code",
+        "vscode": "code",
+        "visual studio code": "code",
+        "pictures": "shell:My Pictures",
+        "pictures folder": "shell:My Pictures",
+        "documents": "shell:Personal",
+        "downloads": "shell:Downloads",
+        "desktop": "shell:Desktop",
+    }
+
     def _resolve_open_query(self, query: str) -> str:
         q = query.strip().lower()
+
+        if q in self.NATIVE_APPS:
+            return f"app:{self.NATIVE_APPS[q]}"
 
         if q in self.SITE_MAP:
             return self.SITE_MAP[q]
@@ -443,30 +465,6 @@ Classify. Output EXACTLY ONE category name."""
         result = self._rule_based_primary(msg)
         return (result, "rule-based")
 
-    def _run_llm_multi(
-        self, system_prompt: str, user_content: str, key_index: int,
-        valid_options: List[str]
-    ) -> Tuple[List[str], str]:
-        
-        if self._llms:
-            try:
-                from langchain_core.messages import SystemMessage, HumanMessage
-                idx = key_index % len(self._llms)
-                llm = self._llms[idx]
-                response = llm.invoke([
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=user_content),
-                ])
-                text = (response.content or "").strip().lower()
-                results = self._parse_multi(text, valid_options)
-                return (results, "llm")
-            
-            except Exception as e:
-                logger.warning("[BRAIN-TASK] LLM failed: %s. Using rule-based.", e)
-
-        msg = user_content.split("User task request:")[-1].strip()[:500] if "User task request:" in user_content else user_content[:500]
-        results = self._rule_based_task(msg)
-        return (results, "rule-based")
 
     def _parse_single(self, text: str, valid_options: List[str], default: str) -> str:
 

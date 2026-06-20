@@ -13,6 +13,7 @@ import time
 import re
 import base64
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import edge_tts
 from app.models import ChatRequest, ChatResponse, TTSRequest
@@ -179,24 +180,45 @@ async def lifespan(app: FastAPI):
 
         yield
 
-        logger.info("\nShutting down J.A.R.V.I.S...")
-        _tts_pool.shutdown(wait=True)
-
-        if task_manager:
-            task_manager.shutdown()
-            
-        from jarvis_os.core.wake_word import shutdown_wake_word_daemon
-        shutdown_wake_word_daemon()
-
-        if chat_service:
-            for session_id in list(chat_service.sessions.keys()):
-                chat_service.save_chat_session(session_id)
-
-        logger.info("All sessions saved. Goodbye!")
-
     except Exception as e:
         logger.error(f"Fatal error during startup: {e}", exc_info=True)
         raise
+
+    finally:
+        logger.info("\nShutting down J.A.R.V.I.S...")
+        try:
+            _tts_pool.shutdown(wait=True)
+        except Exception as e:
+            logger.error(f"Error shutting down TTS pool: {e}")
+
+        if task_manager:
+            try:
+                task_manager.shutdown()
+            except Exception as e:
+                logger.error(f"Error shutting down task manager: {e}")
+            
+        try:
+            from jarvis_os.core.wake_word import shutdown_wake_word_daemon
+            shutdown_wake_word_daemon()
+        except Exception as e:
+            logger.error(f"Error shutting down wake word daemon: {e}")
+
+        if chat_service:
+            for session_id in list(chat_service.sessions.keys()):
+                try:
+                    chat_service.save_chat_session(session_id)
+                except Exception as e:
+                    logger.error(f"Error saving session {session_id}: {e}")
+
+        logger.info("All sessions saved. Goodbye!")
+
+        try:
+            from jarvis_os.core.usage import flush_usage
+            flush_usage()
+            logger.info("Usage data flushed to disk.")
+        except Exception as e:
+            logger.error(f"Error flushing usage data: {e}")
+
 
 app = FastAPI(
     title="J.A.R.V.I.S API",
@@ -211,13 +233,35 @@ app = FastAPI(
 from jarvis_os.core.state_manager import GlobalStateManager
 _state_mgr = GlobalStateManager()
 
+# ── Security: CORS locked to localhost only ───────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", "Authorization", "X-JARVIS-Token"],
 )
+
+# ── Security: Bearer token auth (only active when JARVIS_API_TOKEN is set) ────
+_JARVIS_TOKEN = os.getenv("JARVIS_API_TOKEN", "").strip()
+_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config"}
+_AUTH_PUBLIC_PREFIXES = ("/app",)
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if not _JARVIS_TOKEN:
+            return await call_next(request)
+        path = request.url.path
+        if path in _AUTH_PUBLIC_PATHS:
+            return await call_next(request)
+        if any(path.startswith(p) for p in _AUTH_PUBLIC_PREFIXES):
+            return await call_next(request)
+        auth = request.headers.get("Authorization", "")
+        if auth == f"Bearer {_JARVIS_TOKEN}":
+            return await call_next(request)
+        return Response("Unauthorized", status_code=401, headers={"WWW-Authenticate": "Bearer"})
+
+app.add_middleware(AuthMiddleware)
 
 class TimingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -229,6 +273,15 @@ class TimingMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(TimingMiddleware)
+
+@app.get("/api/config")
+async def get_frontend_config(request: Request):
+    """Returns the API token to localhost callers so the frontend can self-configure."""
+    client_host = request.client.host if request.client else ""
+    if client_host not in ("127.0.0.1", "::1", "localhost"):
+        raise HTTPException(status_code=403, detail="Config only accessible from localhost")
+    from config import ASSISTANT_NAME
+    return {"token": _JARVIS_TOKEN, "assistant_name": ASSISTANT_NAME}
 
 @app.get("/api")
 
@@ -259,7 +312,7 @@ async def get_dashboard():
     
     track_event("dashboard_open")
     manager = DashboardManager()
-    data = manager.get_full_dashboard()
+    data = manager.get_dashboard()
     
     # Inject wake word status
     daemon = get_wake_word_daemon()
@@ -310,7 +363,6 @@ async def operator_action(request: OperatorActionRequest):
     Unified endpoint for Operator UI actions.
     """
     from jarvis_os.desktop_action.desktop_action_manager import DesktopActionManager
-    from jarvis_os.core.quick_links import record_site_usage
     
     if request.action == "toggle_wake_word":
         from jarvis_os.core.wake_word import get_wake_word_daemon
@@ -323,7 +375,6 @@ async def operator_action(request: OperatorActionRequest):
     if request.action == "open_site":
         site_alias = request.payload.get("site", "") if request.payload else ""
         if site_alias:
-            record_site_usage(site_alias)
             from jarvis_os.core.usage import track_event, track_site
             track_event("browser_open")
             track_site(site_alias)
@@ -582,46 +633,10 @@ def _merge_short(sentences):
     return merged
 
 def _generate_tts_sync(text: str, voice: str, rate: str) -> bytes:
+    """Delegates to the shared TTS utility — single source of truth for audio generation."""
+    from app.tts_utils import generate_tts_bytes
+    return generate_tts_bytes(text, voice, rate)
 
-    def _elevenlabs_tts():
-        from elevenlabs import Voice, VoiceSettings
-        from elevenlabs.client import ElevenLabs
-        client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-        voice_obj = Voice(
-            voice_id=ELEVENLABS_VOICE_ID,
-            settings=VoiceSettings(
-                stability=ELEVENLABS_STABILITY,
-                similarity_boost=ELEVENLABS_SIMILARITY,
-                style=ELEVENLABS_STYLE,
-                use_speaker_boost=ELEVENLABS_SPEAKER_BOOST
-            )
-        )
-        audio = client.generate(
-            text=text,
-            voice=voice_obj,
-            model="eleven_multilingual_v2"
-        )
-        # client.generate returns a generator yielding bytes
-        return b"".join(list(audio))
-
-    async def _edge_tts():
-        communicate = edge_tts.Communicate(text=text, voice=voice, rate=rate)
-        parts = []
-
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                parts.append(chunk["data"])
-
-        return b"".join(parts)
-
-    if VOICE_PROVIDER == "elevenlabs" and ELEVENLABS_API_KEY:
-        try:
-            return _elevenlabs_tts()
-        except Exception as e:
-            logger.warning("[TTS] ElevenLabs failed, falling back to edge-tts: %s", e)
-            return asyncio.run(_edge_tts())
-    else:
-        return asyncio.run(_edge_tts())
 
 def is_hindi_text(text: str) -> bool:
     """Check if the text contains Devanagari (Hindi) characters."""
@@ -1025,7 +1040,7 @@ async def text_to_speech(request: TTSRequest):
 @app.post("/stt")
 async def speech_to_text(
     file: "UploadFile",
-    language: str = None,
+    language: str = "en",
 ):
     """
     Speech-to-Text endpoint using Groq Whisper.
@@ -1083,9 +1098,9 @@ async def root_redirect():
 def run():
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
+        host="127.0.0.1",   # localhost only — not exposed to network
         port=8000,
-        reload=True,
+        reload=False,       # disabled for stable always-on runtime
         log_level="info"
     )
 

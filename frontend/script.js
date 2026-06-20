@@ -213,6 +213,16 @@ function init() {
     bindEvents();
     setMode(currentMode);
     autoResizeInput();
+    
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    if (action === 'talk') {
+        setTimeout(() => toggleListening(), 500);
+    } else if (action === 'brief') {
+        setTimeout(() => sendMessage("Give me a daily briefing"), 500);
+    } else if (action === 'analyze') {
+        setTimeout(() => sendMessage("Analyze my screen"), 500);
+    }
 }
 
 async function preloadStarterAudio() {
@@ -358,7 +368,7 @@ let isSpeaking = false;
 function monitorVAD() {
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
     
-    const checkSilence = () => {
+        const checkSilence = () => {
         if (!isListening) return;
         
         analyser.getByteFrequencyData(dataArray);
@@ -366,7 +376,7 @@ function monitorVAD() {
         for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
         let average = sum / dataArray.length;
         
-        const VOLUME_THRESHOLD = 15;
+        const VOLUME_THRESHOLD = 3; // Lowered from 15 to be more sensitive
         
         if (average > VOLUME_THRESHOLD) {
             if (!isSpeaking) {
@@ -387,7 +397,7 @@ function monitorVAD() {
                         mediaRecorder.stop();
                     }
                     stopListeningInternal();
-                }, 1200);
+                }, 1200); // Reduced to 1200ms for faster responsiveness
             }
         }
         vadRAF = requestAnimationFrame(checkSilence);
@@ -444,7 +454,7 @@ async function processSTT(blob) {
     
     const formData = new FormData();
     formData.append('file', blob, 'audio.webm');
-    formData.append('language', 'en'); // Force English to prevent hallucination
+    // Language is omitted so Whisper can auto-detect (allows Hindi/Hinglish)
     
     try {
         const res = await fetch(`${API}/stt`, {

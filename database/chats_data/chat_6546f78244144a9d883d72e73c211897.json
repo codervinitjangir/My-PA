@@ -1,0 +1,13 @@
+{
+  "session_id": "6546f782-4414-4a9d-883d-72e73c211897",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Give me a daily briefing"
+    },
+    {
+      "role": "assistant",
+      "content": "Your daily briefing includes top tech news, GitHub updates, and personalized calendar summaries. For detailed scheduling, I can provide information on your upcoming meetings and tasks, Boss."
+    }
+  ]
+}

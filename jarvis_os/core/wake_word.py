@@ -156,6 +156,7 @@ class WakeWordDaemon:
             wf.writeframes(audio_data.tobytes())
             
         wav_bytes = wav_io.getvalue()
+        wav_io.close()
         
         del frames
         del audio_data
@@ -205,27 +206,24 @@ class WakeWordDaemon:
             logger.warning("[WakeWord] No chat_service attached!")
             
     def _speak(self, text: str):
-        import asyncio
-        import edge_tts
+        """
+        Speak a response locally using the shared JARVIS TTS pipeline.
+        Routes through app.tts_utils — same voice, same config, one architecture.
+        Runs in a daemon thread so it never blocks the wake word loop.
+        """
         from config import TTS_VOICE, TTS_RATE
-        
-        async def _run():
+
+        def _run():
             try:
-                communicate = edge_tts.Communicate(text=text, voice=TTS_VOICE, rate=TTS_RATE)
-                import tempfile
-                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-                    tmp = f.name
-                await communicate.save(tmp)
-                
-                import platform
-                if platform.system() == "Windows":
-                    import os
-                    os.system(f'start /min mplay32 /play /close "{tmp}"')
+                from app.tts_utils import generate_tts_bytes, play_audio_locally
+                audio_bytes = generate_tts_bytes(text, TTS_VOICE, TTS_RATE)
+                play_audio_locally(audio_bytes)
             except Exception as e:
                 logger.error(f"[WakeWord] TTS error: {e}")
-                
-        t = threading.Thread(target=lambda: asyncio.run(_run()), daemon=True)
+
+        t = threading.Thread(target=_run, daemon=True)
         t.start()
+
 
 
 def init_wake_word_daemon(chat_service, stt_service):

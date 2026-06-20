@@ -1,7 +1,0 @@
-{
-  "enable_voice": true,
-  "enable_vision": true,
-  "enable_realtime_search": true,
-  "enable_autonomous_mode": false,
-  "enable_device_control": false
-}

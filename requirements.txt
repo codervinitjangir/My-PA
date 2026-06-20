@@ -1,33 +1,54 @@
+# =============================================================================
+# J.A.R.V.I.S — Python Dependencies
+# =============================================================================
+
+# ── Core API ──────────────────────────────────────────────────────────────────
 fastapi>=0.100.0,<1.0
 uvicorn[standard]>=0.22.0
+python-multipart>=0.0.7
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# ── AI / LLM ─────────────────────────────────────────────────────────────────
 langchain>=0.3.0
 langchain-groq>=0.2.0
 langchain-community>=0.3.0
 langchain-core>=0.3.0
 langchain-huggingface>=0.1.0
 langchain-text-splitters>=0.2.0
+groq>=0.9.0
+
+# ── Vector Store / Embeddings ─────────────────────────────────────────────────
 sentence-transformers>=2.2.0
 faiss-cpu>=1.7.0
-python-dotenv>=1.0.0
-pydantic>=2.0.0
-numpy>=1.24.0
 torch>=2.0.0
 transformers>=4.30.0
+
+# ── Web / Networking ──────────────────────────────────────────────────────────
 requests>=2.28.0
-rich>=13.0.0
-tavily-python>=0.5.0
-edge-tts>=6.1.0
 httpx>=0.24.0
-groq>=0.9.0
-python-multipart>=0.0.7
-elevenlabs
+tavily-python>=0.5.0
+beautifulsoup4>=4.12.0
 
-PySide6
+# ── Text-to-Speech (Primary: edge-tts, no API key needed) ────────────────────
+edge-tts>=6.1.0
 
-beautifulsoup4
-requests
+# ── Text-to-Speech (Optional: ElevenLabs premium voice) ──────────────────────
+# Only needed if VOICE_PROVIDER=elevenlabs and ELEVENLABS_API_KEY is set in .env
+# Uncomment to enable:
+# elevenlabs>=1.0.0
 
-openwakeword
-sounddevice
-numpy
-scipy
+# ── Wake Word (Optional: requires openwakeword model download) ────────────────
+# Run after install: python -m openwakeword.utils.download_models --models hey_jarvis
+openwakeword>=0.6.0
+sounddevice>=0.4.6
+numpy>=1.24.0
+scipy>=1.11.0
+
+# ── Presence Mode / System Tray (PySide6) ────────────────────────────────────
+# Used by jarvis_desktop/ (tray_icon.py, presence_window.py). ~500MB install.
+PySide6>=6.5.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+Pillow>=10.0.0
+rich>=13.0.0

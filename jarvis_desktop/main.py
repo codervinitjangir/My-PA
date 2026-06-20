@@ -31,8 +31,8 @@ def main():
     tray = JarvisTrayIcon(window)
     tray.show()
     
-    # Don't show the window by default on startup unless requested
-    # The user can toggle it from the tray
+    # Show the window by default on startup
+    window.show()
     
     sys.exit(app.exec())
 

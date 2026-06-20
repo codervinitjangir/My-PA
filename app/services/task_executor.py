@@ -23,6 +23,7 @@ class TaskResponse:
     contents: List[str] = field(default_factory=list)
     googlesearches: List[str] = field(default_factory=list)
     youtubesearches: List[str] = field(default_factory=list)
+    desktop_apps: List[str] = field(default_factory=list)
     cam: Optional[dict] = None
 
 class TaskExecutor:
@@ -86,54 +87,68 @@ class TaskExecutor:
         t0 = time.perf_counter()
         failed_tags = []
         
+        executor = ThreadPoolExecutor(max_workers=min(6, len(tasks)))
         try:
+            futures = {
+                executor.submit(fn, p): (tag, fn, p)
+                for tag, fn, p in tasks
+            }
             
-            with ThreadPoolExecutor(max_workers=min(6, len(tasks))) as executor:
-                futures = {
-                    executor.submit(fn, p): (tag, fn, p)
-                    for tag, fn, p in tasks
-                }
+            for future in as_completed(futures, timeout=TASK_EXECUTION_TIMEOUT):
+                tag, fn, payload = futures[future]
                 
-                for future in as_completed(futures, timeout=TASK_EXECUTION_TIMEOUT):
-                    tag, fn, payload = futures[future]
-                    
-                    try:
-                        result = future.result()
-                        if tag == "wopen" and result:
+                try:
+                    result = future.result()
+                    if tag == "wopen" and result:
+                        if result.startswith("app:"):
+                            app_target = result[4:]
+                            import os
+                            try:
+                                os.startfile(app_target)
+                                response.desktop_apps.append(app_target)
+                            except Exception as e:
+                                logger.error(f"[TASK] Failed to open desktop app {app_target}: {e}")
+                        else:
                             response.wopens.append(result)
-                            
-                        elif tag == "play" and result:
-                            response.plays.append(result)
-                            
-                        elif tag == "image" and result:
-                            response.images.append(result)
-                            
-                        elif tag == "content" and result:
-                            response.contents.append(result)
-                            
-                        elif tag == "google" and result:
-                            response.googlesearches.append(result)
-                            
-                        elif tag == "youtube" and result:
-                            response.youtubesearches.append(result)
-                            
-                    except Exception as e:
-                        failed_tags.append(tag)
-                        err_msg = str(e)[:100]
-                        logger.warning("[TASK] Task %s failed: %s", tag, e)
                         
-                        if "content_policy" in err_msg.lower() or "safety" in err_msg.lower():
-                            if tag == "image":
-                                response.text = "I couldn't generate that image - it may violate content guidelines."
-                                
-                        elif not response.text:
-                            response.text = f"Something went wrong with that task: {err_msg}"
+                    elif tag == "play" and result:
+                        response.plays.append(result)
+                        
+                    elif tag == "image" and result:
+                        response.images.append(result)
+                        
+                    elif tag == "content" and result:
+                        response.contents.append(result)
+                        
+                    elif tag == "google" and result:
+                        response.googlesearches.append(result)
+                        
+                    elif tag == "youtube" and result:
+                        response.youtubesearches.append(result)
+                        
+                except Exception as e:
+                    failed_tags.append(tag)
+                    err_msg = str(e)[:100]
+                    logger.warning("[TASK] Task %s failed: %s", tag, e)
+                    
+                    if "content_policy" in err_msg.lower() or "safety" in err_msg.lower():
+                        if tag == "image":
+                            response.text = "I couldn't generate that image - it may violate content guidelines."
                             
+                    elif not response.text:
+                        response.text = f"Something went wrong with that task: {err_msg}"
+                        
         except FuturesTimeoutError:
             logger.warning("[TASK] Task execution timed out after %ds", TASK_EXECUTION_TIMEOUT)
             
             if not response.text:
                 response.text = "Some tasks took too long. Please try again."
+        finally:
+            try:
+                executor.shutdown(wait=False, cancel_futures=True)
+            except TypeError:
+                # Fallback for Python < 3.9
+                executor.shutdown(wait=False)
                 
         elapsed = time.perf_counter() - t0
         logger.info("[TASK] Executed %d tasks in %.2fs (failed: %s)", len(tasks), elapsed, failed_tags or "none")
@@ -142,6 +157,7 @@ class TaskExecutor:
             parts = self.build_conversational_response(
                 response.wopens, response.plays, response.images,
                 response.contents, response.googlesearches, response.youtubesearches,
+                response.desktop_apps
             )
             response.text = parts if parts else "All done."
             
@@ -181,9 +197,19 @@ class TaskExecutor:
         contents: List[str],
         googlesearches: List[str],
         youtubesearches: List[str],
+        desktop_apps: List[str] = None,
     ) -> str:
         
         parts = []
+        
+        if desktop_apps:
+            names = [app.split(".")[0].title() for app in desktop_apps]
+            if len(names) == 1:
+                parts.append(f"I've opened {names[0]} for you.")
+            else:
+                last = names[-1]
+                rest = ", ".join(names[:-1])
+                parts.append(f"I've opened {rest} and {last} for you.")
         
         if wopens:
             names = [self._url_to_display_name(u) for u in wopens]
@@ -231,6 +257,9 @@ class TaskExecutor:
     def _do_open(self, payload: dict) -> Optional[str]:
         url = payload.get("url", "").strip()
         
+        if url.startswith("app:"):
+            return url
+            
         if not url:
             return None
         return self._validate_url(url)

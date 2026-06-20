@@ -572,12 +572,52 @@ class ChatService:
                 self.save_chat_session(session_id)
                 return
             else:
-                # User requested vision but no image was provided
-                no_img_msg = "Please open the webcam or attach an image so I can see what you're referring to."
-                self.sessions[session_id][-1].content = no_img_msg
-                yield no_img_msg
-                self.save_chat_session(session_id)
-                return
+                # User requested vision but no webcam image provided -> fallback to desktop screen capture
+                yield {
+                    "_activity": {
+                        "event": "vision_processing",
+                        "status": "capturing_screen"
+                    }
+                }
+                
+                try:
+                    from jarvis_os.observers.screen_observer import ScreenObserver
+                    observer = ScreenObserver()
+                    image_bytes = observer.capture_screen()
+                    imgbase64 = observer.sanitize_data(image_bytes)
+                    del image_bytes
+                    
+                    v_t0 = time.perf_counter()
+                    vision_res = self.vision_service.analyze_image(
+                        clean_user_message,
+                        imgbase64,
+                        chat_history
+                    )
+                    v_ms = int((time.perf_counter() - v_t0) * 1000)
+                    del imgbase64
+                    
+                    yield {
+                        "_activity": {
+                            "event": "vision_processing",
+                            "status": "done",
+                            "elapsed_ms": v_ms
+                        }
+                    }
+                    
+                    self.sessions[session_id][-1].content = vision_res
+                    yield vision_res
+                    self.save_chat_session(session_id)
+                    return
+                    
+                except Exception as e:
+                    import logging
+                    log = logging.getLogger("J.A.R.V.I.S")
+                    log.error(f"[ChatService] Screen capture fallback failed: {e}")
+                    no_img_msg = "Please open the webcam or attach an image so I can see what you're referring to."
+                    self.sessions[session_id][-1].content = no_img_msg
+                    yield no_img_msg
+                    self.save_chat_session(session_id)
+                    return
         
         if query_type in ("task", "automation", "mixed") and tasks:
             if self.task_manager and self.brain_service:
@@ -635,12 +675,20 @@ class ChatService:
                         }
                     }
 
-                    # If this was PURELY a task (not mixed), use the conversational response
+                    # If this was PURELY an instant task (not mixed), use the conversational response
                     if query_type == "task" and task_res.text:
                         self.sessions[session_id][-1].content = task_res.text
                         yield task_res.text
                         self.save_chat_session(session_id)
                         return
+                        
+                # 3. If there were ONLY background tasks, return instantly
+                if not instant_intents and heavy_intents and query_type == "task":
+                    msg = "I've started that task in the background for you."
+                    self.sessions[session_id][-1].content = msg
+                    yield msg
+                    self.save_chat_session(session_id)
+                    return
 
         yield {
             "_activity": {
@@ -694,6 +742,12 @@ class ChatService:
                     self.save_chat_session(session_id, log_timing=False)
 
                 yield chunk
+
+        except Exception as e:
+            logger.error("[JARVIS-STREAM] Exception during stream: %s", e, exc_info=True)
+            error_msg = f"\n\n[System: I encountered an error while processing that: {str(e)}]"
+            self.sessions[session_id][-1].content += error_msg
+            yield error_msg
 
         finally:
             final_response = self.sessions[session_id][-1].content
