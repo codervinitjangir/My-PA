@@ -187,6 +187,17 @@
                 <p class="settings-hint">Activity and search panels open automatically when data is available. Thinking sounds play a short cue while the AI processes. Voice interruption lets you interrupt the AI by speaking — it will stop talking and listen to you.</p>
             </div>
         </div>
+        <div class="briefing-panel glass-panel" id="briefing-panel" aria-hidden="true">
+            <div class="briefing-header">
+                <h3 class="briefing-title" id="briefing-title">Daily Brief</h3>
+                <button class="briefing-close btn-icon" id="briefing-close" title="Close" aria-label="Close briefing">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="briefing-body" id="briefing-body">
+                <!-- Briefing content injected here -->
+            </div>
+        </div>
         <div class="panel-overlay" id="panel-overlay" aria-hidden="true"></div>
         <div class="speech-widget" id="speech-widget" aria-hidden="true">
             <div class="speech-widget-inner">
@@ -223,5 +234,6 @@
     </div>
     <script src="orb.js"></script>
     <script src="script.js"></script>
+    <script src="components/dashboard.js"></script>
 </body>
 </html>

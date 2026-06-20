@@ -227,6 +227,19 @@ class GroqService:
         extra_system_parts: Optional[List[str]] = None,
         mode_addendum: str = "",
     ) -> tuple:
+        import os
+        
+        if os.getenv("ENABLE_JARVIS_OS", "false").lower() == "true":
+            try:
+                from jarvis_os.runtime.runtime_manager import RuntimeManager
+                jarvis_context = RuntimeManager().build_ai_context()
+                if jarvis_context:
+                    if extra_system_parts is None:
+                        extra_system_parts = []
+                    extra_system_parts.append(jarvis_context)
+            except Exception as e:
+                logger.warning(f"[JARVIS OS RUNTIME] Failed to inject context: {e}")
+
         context = ""
         context_sources = []
         t0 = time.perf_counter()

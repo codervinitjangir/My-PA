@@ -1,0 +1,7 @@
+{
+  "system_name": "JARVIS OS",
+  "version": "1.0.0",
+  "default_language": "en",
+  "max_memory_usage_mb": 0,
+  "logging_level": "INFO"
+}

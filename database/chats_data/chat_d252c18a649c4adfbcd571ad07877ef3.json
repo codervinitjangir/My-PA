@@ -1,0 +1,53 @@
+{
+  "session_id": "d252c18a-649c-4adf-bcd5-71ad07877ef3",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hæ, Jarvis."
+    },
+    {
+      "role": "assistant",
+      "content": "Hello, Boss. How may I assist you today?"
+    },
+    {
+      "role": "user",
+      "content": "Can you open"
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened Google for you."
+    },
+    {
+      "role": "user",
+      "content": "Open WhatsApp."
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened WhatsApp for you."
+    },
+    {
+      "role": "user",
+      "content": "Open YouTube and play तेरे नाम सोब"
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened YouTube for you. I've started playing that for you."
+    },
+    {
+      "role": "user",
+      "content": "open YouTube for me"
+    },
+    {
+      "role": "assistant",
+      "content": "I've opened YouTube for you."
+    },
+    {
+      "role": "user",
+      "content": "O que é isso?"
+    },
+    {
+      "role": "assistant",
+      "content": "Isso é um earbuds da marca realme. O earbud é branco com uma faixa cinza na parte superior. A pessoa está segurando o earbud na mão."
+    }
+  ]
+}

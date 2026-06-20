@@ -1,0 +1,6 @@
+{
+  "environment": "development",
+  "database_path": "data/",
+  "logs_path": "logs/",
+  "temp_path": "data/temp/"
+}

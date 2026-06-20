@@ -444,6 +444,7 @@ async function processSTT(blob) {
     
     const formData = new FormData();
     formData.append('file', blob, 'audio.webm');
+    formData.append('language', 'en'); // Force English to prevent hallucination
     
     try {
         const res = await fetch(`${API}/stt`, {

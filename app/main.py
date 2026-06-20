@@ -16,6 +16,8 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import edge_tts
 from app.models import ChatRequest, ChatResponse, TTSRequest
+from pydantic import BaseModel
+from typing import Optional
 
 RATE_LIMIT_MESSAGE = (
     "You've reached your daily API limit for this assistant. "
@@ -41,6 +43,8 @@ from config import (
     VECTOR_STORE_DIR, GROQ_API_KEYS, GROQ_MODEL, TAVILY_API_KEY,
     EMBEDDING_MODEL, CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHAT_HISTORY_TURNS,
     ASSISTANT_NAME, TTS_VOICE, TTS_RATE,
+    VOICE_PROVIDER, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID,
+    ELEVENLABS_STABILITY, ELEVENLABS_SIMILARITY, ELEVENLABS_STYLE, ELEVENLABS_SPEAKER_BOOST
 )
 
 logging.basicConfig(
@@ -59,6 +63,7 @@ task_manager: TaskManager = None
 vision_service: VisionService = None
 chat_service: ChatService = None
 stt_service: STTService = None
+request_router = None
 
 def print_title():
     """Print the J.A.R.V.I.S ASCII art title."""
@@ -139,6 +144,12 @@ async def lifespan(app: FastAPI):
             task_manager=task_manager,
         )
 
+        from jarvis_os.core.operator_runtime import OperatorRuntime
+        from jarvis_os.core.request_router import RequestRouter
+        operator_runtime = OperatorRuntime(groq_service)
+        global request_router
+        request_router = RequestRouter(chat_service, operator_runtime)
+
         logger.info("Chat service initialized successfully")
         logger.info("Initializing STT service (Groq Whisper)...")
         stt_service = STTService()
@@ -187,6 +198,10 @@ app = FastAPI(
     openapi_url=None
 )
 
+# Singleton state manager — persists screen state between requests
+from jarvis_os.core.state_manager import GlobalStateManager
+_state_mgr = GlobalStateManager()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -225,10 +240,206 @@ async def api_info():
         }
     }
 
+@app.get("/dashboard")
+async def get_dashboard():
+    """Returns the sub-100ms programmatic dashboard state."""
+    from jarvis_os.dashboard.dashboard_manager import DashboardManager
+    from jarvis_os.core.quick_links import QUICK_LINKS, get_top_sites
+    from jarvis_os.core.usage import track_event
+    track_event("dashboard_open")
+    manager = DashboardManager()
+    data = manager.get_dashboard()
+    data["quick_links"] = QUICK_LINKS
+    data["top_sites"] = get_top_sites()
+    # Inject current screen state from the singleton state manager
+    data["current_screen"] = _state_mgr.mock_states.get("screen")
+    return data
+
+@app.get("/mobile/state")
+async def get_mobile_state():
+    """Minimal state endpoint for Android Companion."""
+    from jarvis_os.dashboard.dashboard_manager import DashboardManager
+    manager = DashboardManager()
+    dash = manager.get_dashboard()
+    
+    # Map to the strict required response
+    screen_state = _state_mgr.mock_states.get("screen", {})
+    activity = screen_state.get("activity", "Unknown") if isinstance(screen_state, dict) else "Unknown"
+
+    return {
+        "greeting": dash.get("greeting", "Hello Boss"),
+        "current_project": dash.get("active_project", "No active project"),
+        "current_focus": dash.get("current_focus", "No focus set"),
+        "pending_count": dash.get("pending_items", 0),
+        "workspace": "Jarvis",
+        "active_session": True,
+        "screen_activity": activity
+    }
+
+
+@app.get("/briefing")
+async def get_briefing():
+    """Returns the sub-50ms programmatic daily brief state."""
+    from jarvis_os.daily_brief.daily_brief_manager import DailyBriefManager
+    from jarvis_os.core.usage import track_event
+    track_event("morning_brief")
+    manager = DailyBriefManager()
+    return manager.get_briefing()
+
+class OperatorActionRequest(BaseModel):
+    action: str
+    payload: Optional[dict] = None
+
+@app.post("/operator/action")
+async def operator_action(request: OperatorActionRequest):
+    """
+    Unified endpoint for Operator UI actions.
+    """
+    from jarvis_os.desktop_action.desktop_action_manager import DesktopActionManager
+    from jarvis_os.core.quick_links import record_site_usage
+    
+    if request.action == "open_site":
+        site_alias = request.payload.get("site", "") if request.payload else ""
+        if site_alias:
+            record_site_usage(site_alias)
+            from jarvis_os.core.usage import track_event, track_site
+            track_event("browser_open")
+            track_site(site_alias)
+            
+        manager = DesktopActionManager()
+        # Not simulating by default when clicking UI links
+        result = manager.process_request("open_site", site_alias, user_approved=True, simulate=False)
+        return {"success": result.success, "message": result.message}
+
+    if request.action == "analyze_screen":
+        from jarvis_os.observers.screen_observer import ScreenObserver, CooldownError
+        from jarvis_os.core.usage import track_event
+        from app.services.vision_service import VisionService
+
+        observer = ScreenObserver()
+        try:
+            # 1. Capture — native PIL screenshot, in-memory only
+            image_bytes = observer.capture_screen()
+
+            # 2. Sanitize — base64, no file write
+            img_b64 = observer.sanitize_data(image_bytes)
+            del image_bytes  # privacy: delete raw bytes immediately
+
+            # 3. Analyze via existing VisionService (Groq Llama 4 Scout)
+            vision = VisionService()
+            from jarvis_os.observers.screen_observer import _SCREEN_PROMPT
+            raw_text = vision.analyze_image(prompt=_SCREEN_PROMPT, img_base64=img_b64)
+            del img_b64  # privacy: delete base64 immediately after sending
+
+            # 4. Parse into ScreenState
+            screen_state = observer.parse_response(raw_text)
+
+            # 5. Update cooldown timestamp
+            observer._last_analyzed = screen_state.timestamp
+
+            # 6. Persist in global state (no image stored — only metadata)
+            from jarvis_os.core.state_manager import GlobalStateManager
+            _state_mgr.update_runtime_state("screen", screen_state.model_dump())
+
+            # 7. Track usage
+            track_event("screen_analysis")
+
+            return screen_state.model_dump()
+
+        except CooldownError as e:
+            return {"error": str(e), "cooldown": True}
+        except Exception as e:
+            logger.warning("[SCREEN] Analysis failed: %s", e)
+            return {"error": f"Screen analysis failed: {str(e)}", "cooldown": False}
+
+    if request.action in ("morning_brief", "resume_session", "refresh_dashboard"):
+        from jarvis_os.core.usage import track_event
+        # Simply acknowledge the action. The backend logs the intent.
+        # Future: connect to active websocket to push UI changes to PC dashboard.
+        if request.action == "morning_brief": track_event("morning_brief")
+        if request.action == "resume_session": track_event("session_resume")
+        if request.action == "refresh_dashboard": track_event("dashboard_open")
+        
+        logger.info(f"[MOBILE] Action received: {request.action}")
+        return {"success": True, "message": f"{request.action} acknowledged"}
+
+    return {"success": False, "message": f"Unknown action: {request.action}"}
+
+# ── Telegram Webhook ──────────────────────────────────────────────────────────
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    """
+    Receives Telegram updates and forwards to telegram_bridge.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return {"status": "ok"}
+        
+    if "message" in data:
+        message = data["message"]
+        text = message.get("text", "")
+        chat_id = message.get("chat", {}).get("id")
+        user_id = message.get("from", {}).get("id")
+        
+        if text and chat_id and user_id:
+            from jarvis_os.core.telegram_bridge import handle_telegram_command
+            import asyncio
+            # Fire and forget to not block webhook response
+            asyncio.create_task(asyncio.to_thread(handle_telegram_command, chat_id, user_id, text))
+            
+    return {"status": "ok"}
+
+# ── Friction Log ──────────────────────────────────────────────────────────────
+
+@app.get("/frictions")
+async def get_frictions_endpoint():
+    """Return all friction items, open first."""
+    from jarvis_os.core.friction import get_frictions
+    return get_frictions()
+
+@app.post("/frictions")
+async def add_friction_endpoint(body: dict):
+    """Add a new friction item. Body: { 'text': '...' }"""
+    from jarvis_os.core.friction import add_friction
+    text = (body.get("text") or "").strip()
+    if not text:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="text is required")
+    return add_friction(text)
+
+@app.patch("/frictions/{friction_id}")
+async def resolve_friction_endpoint(friction_id: str):
+    """Mark a friction item as resolved."""
+    from jarvis_os.core.friction import resolve_friction
+    from fastapi import HTTPException
+    item = resolve_friction(friction_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Friction not found")
+    return item
+
+@app.delete("/frictions/{friction_id}")
+async def delete_friction_endpoint(friction_id: str):
+    """Permanently delete a friction item."""
+    from jarvis_os.core.friction import delete_friction
+    from fastapi import HTTPException
+    if not delete_friction(friction_id):
+        raise HTTPException(status_code=404, detail="Friction not found")
+    return {"deleted": True}
+
+# ── Usage Validation ──────────────────────────────────────────────────────────
+
+@app.get("/usage")
+async def get_usage():
+    """Returns today's usage summary and all-time totals."""
+    from jarvis_os.core.usage import get_today_summary
+    return get_today_summary()
+
 @app.get("/health")
 
 async def health():
-
+    """Simple health check endpoint."""
     try:
         return {
             "status": "healthy",
@@ -259,7 +470,7 @@ async def chat(request: ChatRequest):
 
     try:
         session_id = chat_service.get_or_create_session(request.session_id)
-        response_text = chat_service.process_message(session_id, request.message)
+        response_text = request_router.process_request(session_id, request.message)
         chat_service.save_chat_session(session_id)
         logger.info("[API /chat] Done | session_id=%s | response_len=%d", session_id[:12], len(response_text))
         return ChatResponse(response=response_text, session_id=session_id)
@@ -350,7 +561,28 @@ def _merge_short(sentences):
 
 def _generate_tts_sync(text: str, voice: str, rate: str) -> bytes:
 
-    async def _inner():
+    def _elevenlabs_tts():
+        from elevenlabs import Voice, VoiceSettings
+        from elevenlabs.client import ElevenLabs
+        client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+        voice_obj = Voice(
+            voice_id=ELEVENLABS_VOICE_ID,
+            settings=VoiceSettings(
+                stability=ELEVENLABS_STABILITY,
+                similarity_boost=ELEVENLABS_SIMILARITY,
+                style=ELEVENLABS_STYLE,
+                use_speaker_boost=ELEVENLABS_SPEAKER_BOOST
+            )
+        )
+        audio = client.generate(
+            text=text,
+            voice=voice_obj,
+            model="eleven_multilingual_v2"
+        )
+        # client.generate returns a generator yielding bytes
+        return b"".join(list(audio))
+
+    async def _edge_tts():
         communicate = edge_tts.Communicate(text=text, voice=voice, rate=rate)
         parts = []
 
@@ -360,7 +592,14 @@ def _generate_tts_sync(text: str, voice: str, rate: str) -> bytes:
 
         return b"".join(parts)
 
-    return asyncio.run(_inner())
+    if VOICE_PROVIDER == "elevenlabs" and ELEVENLABS_API_KEY:
+        try:
+            return _elevenlabs_tts()
+        except Exception as e:
+            logger.warning("[TTS] ElevenLabs failed, falling back to edge-tts: %s", e)
+            return asyncio.run(_edge_tts())
+    else:
+        return asyncio.run(_edge_tts())
 
 def is_hindi_text(text: str) -> bool:
     """Check if the text contains Devanagari (Hindi) characters."""
@@ -386,7 +625,8 @@ def _stream_generator(session_id: str, chunk_iter, is_realtime: bool, tts_enable
         if not text or not text.strip():
             return
         
-        voice = "hi-IN-MadhurNeural" if is_hindi_text(text) else TTS_VOICE
+        # Use edge-tts language matching rules (these are passed down and used by _edge_tts fallback)
+        voice = "hi-IN-MadhurNeural" if is_hindi_text(text) else "en-GB-RyanNeural"
         audio_queue.append((_tts_pool.submit(_generate_tts_sync, text, voice, TTS_RATE), text))
         last_submit_time = time.perf_counter()
 
@@ -551,7 +791,7 @@ async def chat_stream(request: ChatRequest):
     try:
         session_id = chat_service.get_or_create_session(request.session_id)
         
-        chunk_iter = chat_service.process_message_stream(session_id, request.message)
+        chunk_iter = request_router.process_request_stream(session_id, request.message)
         return StreamingResponse(
             _stream_generator(session_id, chunk_iter, is_realtime=False, tts_enabled=request.tts),
             media_type="text/event-stream",
