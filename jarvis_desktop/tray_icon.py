@@ -24,7 +24,8 @@ class JarvisTrayIcon(QSystemTrayIcon):
             self.setIcon(QIcon(icon_path))
         else:
             # Fallback to standard app icon if available
-            self.setIcon(QApplication.style().standardIcon(QApplication.style().SP_ComputerIcon))
+            from PySide6.QtWidgets import QStyle
+            self.setIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
             
         self.setToolTip("JARVIS Presence Mode")
         self.activated.connect(self.on_activated)

@@ -7,7 +7,22 @@
   "quick_links": {},
   "daily_history": {
     "2026-06-20": {
-      "dashboard_open": 3
+      "dashboard_open": 3,
+      "presence_open": 2
     }
-  }
+  },
+  "web_open": 0,
+  "web_search": 0,
+  "web_summarize": 0,
+  "presence_open": 2,
+  "presence_hide": 0,
+  "presence_brief": 0,
+  "presence_dashboard": 0,
+  "presence_analyze": 0,
+  "presence_voice": 0,
+  "wake_detected": 0,
+  "wake_command_executed": 0,
+  "wake_timeout": 0,
+  "wake_toggle_on": 0,
+  "wake_toggle_off": 0
 }
