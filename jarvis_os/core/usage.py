@@ -20,6 +20,11 @@ _DEFAULT: Dict[str, Any] = {
     "presence_dashboard": 0,
     "presence_analyze": 0,
     "presence_voice": 0,
+    "wake_detected": 0,
+    "wake_command_executed": 0,
+    "wake_timeout": 0,
+    "wake_toggle_on": 0,
+    "wake_toggle_off": 0,
     "quick_links": {},
     "daily_history": {},
 }

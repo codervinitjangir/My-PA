@@ -26,3 +26,8 @@ PySide6
 
 beautifulsoup4
 requests
+
+openwakeword
+sounddevice
+numpy
+scipy

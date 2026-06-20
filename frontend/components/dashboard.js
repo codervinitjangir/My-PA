@@ -53,8 +53,17 @@ function renderDashboard(data) {
     dashboardContainer.innerHTML = `
         <div class="dashboard-header" style="display:flex; justify-content:space-between; align-items:center;">
             <h2>${data.greeting}</h2>
-            <div style="font-size: 0.8rem; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">
-                Telegram Bridge: ${data.telegram_enabled ? '🟢 Connected' : '🔴 Disconnected'}
+            <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                <div style="font-size: 0.8rem; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">
+                    Telegram Bridge: ${data.telegram_enabled ? '🟢 Connected' : '🔴 Disconnected'}
+                </div>
+                ${data.wake_word ? `
+                <div style="font-size: 0.8rem; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:8px;">
+                    <span>${data.wake_word.enabled ? '🟢' : '⚫'} Wake Word</span>
+                    <span style="opacity:0.6; font-size:0.7rem;">Last Wake: ${data.wake_word.last_wake || 'Never'}</span>
+                    <button onclick="toggleWakeWord()" style="background:var(--bg); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:4px; cursor:pointer; padding:2px 6px;">Toggle ON/OFF</button>
+                </div>
+                ` : ''}
             </div>
         </div>
         <div class="dashboard-body">
@@ -189,12 +198,28 @@ async function openSite(siteAlias) {
         if (!result.success && typeof showToast !== 'undefined') {
             showToast(`Failed: ${result.message}`);
         } else {
-            // refresh dashboard to update top sites
             setTimeout(forceRefreshDashboard, 500);
         }
     } catch (e) {
         console.error(e);
         if (typeof showToast !== 'undefined') showToast(`Error opening site`);
+    }
+}
+
+async function toggleWakeWord() {
+    try {
+        const res = await fetch('/operator/action', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'toggle_wake_word' })
+        });
+        const result = await res.json();
+        if (result.success && typeof showToast !== 'undefined') {
+            showToast(result.enabled ? "Wake Word Enabled" : "Wake Word Disabled");
+            setTimeout(forceRefreshDashboard, 500);
+        }
+    } catch (e) {
+        console.error(e);
     }
 }
 

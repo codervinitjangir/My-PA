@@ -165,6 +165,12 @@ async def lifespan(app: FastAPI):
         logger.info("  - Vision (Groq): Ready")
         logger.info("  - STT (Groq Whisper): %s", "Ready" if stt_service and stt_service.is_available else "Not available")
         logger.info("  - Chat Service: Ready")
+        
+        # Wake Word Initialization
+        from jarvis_os.core.wake_word import init_wake_word_daemon
+        init_wake_word_daemon(chat_service, stt_service)
+        logger.info("  - Wake Word Daemon: Ready")
+        
         logger.info("-" * 60)
         logger.info("J.A.R.V.I.S is online and ready!")
         logger.info("API: http://localhost:8000")
@@ -178,6 +184,9 @@ async def lifespan(app: FastAPI):
 
         if task_manager:
             task_manager.shutdown()
+            
+        from jarvis_os.core.wake_word import shutdown_wake_word_daemon
+        shutdown_wake_word_daemon()
 
         if chat_service:
             for session_id in list(chat_service.sessions.keys()):
@@ -246,13 +255,18 @@ async def get_dashboard():
     from jarvis_os.dashboard.dashboard_manager import DashboardManager
     from jarvis_os.core.quick_links import QUICK_LINKS, get_top_sites
     from jarvis_os.core.usage import track_event
+    from jarvis_os.core.wake_word import get_wake_word_daemon
+    
     track_event("dashboard_open")
     manager = DashboardManager()
-    data = manager.get_dashboard()
-    data["quick_links"] = QUICK_LINKS
-    data["top_sites"] = get_top_sites()
-    # Inject current screen state from the singleton state manager
-    data["current_screen"] = _state_mgr.mock_states.get("screen")
+    data = manager.get_full_dashboard()
+    
+    # Inject wake word status
+    daemon = get_wake_word_daemon()
+    data["wake_word"] = {
+        "enabled": daemon.enabled if daemon else False,
+        "last_wake": daemon.last_wake if daemon else None
+    }
     return data
 
 @app.get("/mobile/state")
@@ -298,6 +312,14 @@ async def operator_action(request: OperatorActionRequest):
     from jarvis_os.desktop_action.desktop_action_manager import DesktopActionManager
     from jarvis_os.core.quick_links import record_site_usage
     
+    if request.action == "toggle_wake_word":
+        from jarvis_os.core.wake_word import get_wake_word_daemon
+        daemon = get_wake_word_daemon()
+        if daemon:
+            new_state = daemon.toggle()
+            return {"success": True, "message": "Wake Word Toggled", "enabled": new_state}
+        return {"success": False, "message": "Wake Word Daemon missing"}
+        
     if request.action == "open_site":
         site_alias = request.payload.get("site", "") if request.payload else ""
         if site_alias:
