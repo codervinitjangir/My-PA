@@ -23,3 +23,6 @@ python-multipart>=0.0.7
 elevenlabs
 
 PySide6
+
+beautifulsoup4
+requests

@@ -11,6 +11,9 @@ _DEFAULT: Dict[str, Any] = {
     "screen_analysis": 0,
     "session_resume": 0,
     "browser_open": 0,
+    "web_open": 0,
+    "web_search": 0,
+    "web_summarize": 0,
     "quick_links": {},
     "daily_history": {},
 }

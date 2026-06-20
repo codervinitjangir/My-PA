@@ -29,3 +29,13 @@ class SecurityRules:
             if target_lower.startswith(restricted):
                 return False
         return True
+
+    def verify_web_action(self, action: str) -> bool:
+        """
+        Web Assistant strict rules. 
+        Only allows stateless observing and navigating.
+        """
+        SAFE_WEB_ACTIONS = {"open", "search", "summarize"}
+        if action not in SAFE_WEB_ACTIONS:
+            raise PermissionError(f"Security Block: Web action '{action}' is strictly prohibited. Only stateless {SAFE_WEB_ACTIONS} are allowed.")
+        return True

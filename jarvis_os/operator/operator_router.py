@@ -41,6 +41,18 @@ class OperatorRouter:
                 target_modules=["desktop_action"]
             )
             
+        if "search" in intent:
+            return RoutePlan(
+                intent="web_search",
+                target_modules=["web_assistant"]
+            )
+            
+        if "summarize" in intent:
+            return RoutePlan(
+                intent="web_summarize",
+                target_modules=["web_assistant"]
+            )
+            
         if "project" in intent or "active" in intent:
             return RoutePlan(
                 intent="check_projects",
