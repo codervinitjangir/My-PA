@@ -424,6 +424,17 @@ class ChatService:
         is_vision_requested = CAM_BYPASS_TOKEN in user_message
         clean_user_message = user_message.replace(CAM_BYPASS_TOKEN, "").strip()
         
+        # Intercept /set_model command
+        if clean_user_message.startswith("/set_model "):
+            new_model = clean_user_message.split(" ", 1)[1].strip()
+            logger.info(f"Intercepted /set_model command for model: {new_model}")
+            try:
+                self.groq_service.set_model(new_model)
+                yield f"Model successfully switched to **{new_model}**."
+            except Exception as e:
+                yield f"Failed to switch model: {e}"
+            return
+
         # Use clean message for storage and processing
         self.add_message(session_id, "user", clean_user_message)
         self.add_message(session_id, "assistant", "")
