@@ -11,6 +11,7 @@ from config import CHATS_DATA_DIR, MAX_CHAT_HISTORY_TURNS, GROQ_API_KEYS
 from app.models import ChatMessage
 from app.services.groq_service import GroqService
 from app.services.brain_service import BrainService
+from app.core.orchestrator.orchestrator import Orchestrator
 from app.services.task_executor import TaskExecutor
 from app.services.vision_service import VisionService
 from app.services.task_manager import TaskManager
@@ -31,12 +32,14 @@ class ChatService:
         task_executor: TaskExecutor = None,
         vision_service: VisionService = None,
         task_manager: TaskManager = None,
+        orchestrator: Orchestrator = None,
     ):
         self.groq_service = groq_service
         self.brain_service = brain_service
         self.task_executor = task_executor
         self.vision_service = vision_service
         self.task_manager = task_manager
+        self.orchestrator = orchestrator
         self.sessions: Dict[str, List[ChatMessage]] = {}
         self._save_lock = threading.Lock()
 
@@ -443,6 +446,9 @@ class ChatService:
         search_payload = None
 
         def _run_brain():
+            if self.orchestrator:
+                res = self.orchestrator.route_request(clean_user_message, chat_history)
+                return (res["category"], res["task_types"], res["method"], res["elapsed_ms"])
             if self.brain_service and brain_idx is not None:
                 qt, tasks, r, ms = self.brain_service.classify(
                     clean_user_message, 
