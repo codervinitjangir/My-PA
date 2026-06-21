@@ -32,7 +32,6 @@ def _is_rate_limit_error(exc: Exception) -> bool:
 
 from app.services.vector_store import VectorStoreService
 from app.services.groq_service import GroqService, AllGroqApisFailedError
-from app.services.realtime_service import RealtimeGroqService
 from app.services.chat_service import ChatService
 from app.services.brain_service import BrainService
 from app.services.task_executor import TaskExecutor
@@ -57,7 +56,6 @@ logging.basicConfig(
 logger = logging.getLogger("J.A.R.V.I.S")
 vector_store_service: VectorStoreService = None
 groq_service: GroqService = None
-realtime_service: RealtimeGroqService = None
 brain_service: BrainService = None
 task_executor: TaskExecutor = None
 task_manager: TaskManager = None
@@ -126,9 +124,6 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing Groq service (general queries)...")
         groq_service = GroqService(vector_store_service)
         logger.info("Groq service initialized successfully")
-        logger.info("Initializing Realtime Groq service (with Tavily search)...")
-        realtime_service = RealtimeGroqService(vector_store_service)
-        logger.info("Realtime Groq service initialized successfully")
         logger.info("Initializing Brain service (Groq query classification)...")
         brain_service = BrainService(groq_service)
         logger.info("Brain service initialized successfully")
@@ -144,7 +139,7 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing chat service...")
 
         chat_service = ChatService(
-            groq_service, realtime_service, brain_service,
+            groq_service, brain_service,
             task_executor=task_executor,
             vision_service=vision_service,
             task_manager=task_manager,
@@ -163,8 +158,7 @@ async def lifespan(app: FastAPI):
         logger.info("-" * 60)
         logger.info("Service Status:")
         logger.info("  - Vector Store: Ready")
-        logger.info("  - Groq AI (General): Ready")
-        logger.info("  - Groq AI (Realtime): Ready")
+        logger.info("  - Groq AI (General & Search): Ready")
         logger.info("  - Brain (Unified Decision): Ready")
         logger.info("  - Task Executor: Ready")
         logger.info("  - Background Task Manager: Ready")
@@ -532,7 +526,6 @@ async def health():
             "status": "healthy",
             "vector_store": vector_store_service is not None,
             "groq_service": groq_service is not None,
-            "realtime_service": realtime_service is not None,
             "brain_service": brain_service is not None,
             "task_executor": task_executor is not None,
             "task_manager": task_manager is not None,
@@ -647,9 +640,6 @@ async def chat_realtime(request: ChatRequest):
     if not chat_service:
         raise HTTPException(status_code=503, detail="Chat service not initialized")
     
-    if not realtime_service:
-        raise HTTPException(status_code=503, detail="Realtime service not initialized")
-    
     logger.info("[API /chat/realtime] Incoming | session_id=%s | message_len=%d | message=%.100s",
                 request.session_id or "new", len(request.message), request.message)
     
@@ -681,7 +671,7 @@ async def chat_realtime(request: ChatRequest):
 
 async def chat_realtime_stream(request: ChatRequest):
     
-    if not chat_service or not realtime_service:
+    if not chat_service:
         raise HTTPException(status_code=503, detail="Service not initialized")
     
     logger.info("[API /chat/realtime/stream] Incoming | session_id=%s | message_len=%d | message=%.100s",

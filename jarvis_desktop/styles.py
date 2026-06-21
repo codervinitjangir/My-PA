@@ -35,25 +35,36 @@ QLabel {
     color: #FFFFFF;
 }
 
+/* Tighter info rows */
 #infoLabel {
-    color: #E8E8E8;
-    padding: 6px;
-    font-size: 12px;
-    line-height: 1.4;
+    color: #C8C8C8;
+    padding: 1px 4px;
+    font-size: 11px;
+}
+
+/* Wake word status bar */
+#wakeStatusLabel {
+    color: #888888;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-top: 1px solid rgba(255,255,255,10);
+    border-bottom: 1px solid rgba(255,255,255,10);
 }
 
 QPushButton {
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(50, 50, 50, 200), stop:1 rgba(30, 30, 30, 200));
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(50,50,50,200), stop:1 rgba(30,30,30,200));
     border: 1px solid rgba(255, 255, 255, 20);
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: 7px;
+    padding: 6px 8px;
     color: #FFFFFF;
     font-size: 11px;
     font-weight: 500;
 }
 
 QPushButton:hover {
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(70, 70, 70, 220), stop:1 rgba(45, 45, 45, 220));
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(70,70,70,220), stop:1 rgba(45,45,45,220));
     border: 1px solid rgba(255, 255, 255, 40);
 }
 
@@ -61,13 +72,18 @@ QPushButton:pressed {
     background-color: rgba(25, 25, 25, 250);
 }
 
+QPushButton:disabled {
+    color: #555555;
+    border: 1px solid rgba(255, 255, 255, 10);
+}
+
 QLineEdit {
     background-color: rgba(0, 0, 0, 120);
     border: 1px solid rgba(255, 255, 255, 30);
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: 7px;
+    padding: 6px 10px;
     color: #FFFFFF;
-    font-size: 12px;
+    font-size: 11px;
 }
 
 QLineEdit:focus {
@@ -84,6 +100,7 @@ QLineEdit:focus {
     border: none;
     font-size: 10px;
     color: #888888;
+    padding: 0px;
 }
 
 #minimizeBtn:hover, #hideBtn:hover {
@@ -98,14 +115,14 @@ QScrollArea {
 QScrollBar:vertical {
     border: none;
     background: rgba(30, 30, 30, 100);
-    width: 6px;
-    border-radius: 3px;
+    width: 4px;
+    border-radius: 2px;
 }
 
 QScrollBar::handle:vertical {
     background: rgba(100, 100, 100, 150);
     min-height: 20px;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 
 QScrollBar::handle:vertical:hover {

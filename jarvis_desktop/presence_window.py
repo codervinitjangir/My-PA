@@ -52,7 +52,7 @@ class PresenceWindow(QWidget):
         # Full View
         self.full_widget = QWidget()
         self.full_widget.setObjectName("presenceWindow")
-        self.full_widget.setFixedSize(320, 240)
+        self.full_widget.setFixedSize(320, 360)
         self._setup_full_ui()
 
         self.stacked_widget.addWidget(self.mini_widget)
@@ -67,87 +67,94 @@ class PresenceWindow(QWidget):
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.fetch_data)
         self.refresh_timer.setInterval(30000) # 30s
-        
+
+        self.wake_status_timer = QTimer(self)
+        self.wake_status_timer.timeout.connect(self._fetch_wake_status)
+        self.wake_status_timer.setInterval(2000)  # 2s
+        self._last_history_count = 0
+
         self._track("presence_open")
 
     def _setup_full_ui(self):
         layout = QVBoxLayout(self.full_widget)
-        layout.setContentsMargins(15, 12, 15, 12)
-        layout.setSpacing(6)
-        
-        # Header
+        layout.setContentsMargins(12, 10, 12, 8)
+        layout.setSpacing(3)
+
+        # ── Header ─────────────────────────────────────────────────────────
         header = QHBoxLayout()
         self.status_icon = QLabel("🟢", self.full_widget)
         self.title_label = QLabel("JARVIS ACTIVE", self.full_widget)
         self.title_label.setObjectName("headerTitle")
-        
+
         self.minimize_btn = QPushButton("—", self.full_widget)
         self.minimize_btn.setObjectName("minimizeBtn")
-        self.minimize_btn.setFixedSize(20, 20)
+        self.minimize_btn.setFixedSize(18, 18)
         self.minimize_btn.setToolTip("Minimize to tray")
         self.minimize_btn.clicked.connect(self.hide)
 
         self.hide_btn = QPushButton("✖", self.full_widget)
         self.hide_btn.setObjectName("hideBtn")
-        self.hide_btn.setFixedSize(20, 20)
+        self.hide_btn.setFixedSize(18, 18)
         self.hide_btn.setToolTip("Close to tray")
         self.hide_btn.clicked.connect(self.hide)
-        
+
         header.addWidget(self.status_icon)
         header.addWidget(self.title_label)
         header.addStretch()
         header.addWidget(self.minimize_btn)
         header.addWidget(self.hide_btn)
         layout.addLayout(header)
-        
-        # Info
+
+        # ── Info row ───────────────────────────────────────────────────────
         self.workspace_label = QLabel("Workspace: Loading...", self.full_widget)
         self.workspace_label.setObjectName("infoLabel")
         self.pending_label = QLabel("Pending: Loading...", self.full_widget)
         self.pending_label.setObjectName("infoLabel")
         self.health_label = QLabel("Latency: Checking...", self.full_widget)
         self.health_label.setObjectName("infoLabel")
-        
+
         layout.addWidget(self.workspace_label)
         layout.addWidget(self.pending_label)
         layout.addWidget(self.health_label)
-        
-        layout.addStretch()
-        
-        # Buttons Grid
+
+        # ── Wake word status bar ───────────────────────────────────────────
+        self.wake_status_label = QLabel("⚫  Wake Word: Off", self.full_widget)
+        self.wake_status_label.setObjectName("wakeStatusLabel")
+        layout.addWidget(self.wake_status_label)
+
+        # ── Buttons ────────────────────────────────────────────────────────
         btn_grid1 = QHBoxLayout()
+        btn_grid1.setSpacing(4)
         self.talk_btn = QPushButton("🎤 Talk", self.full_widget)
         self.talk_btn.clicked.connect(self.action_talk)
         self.brief_btn = QPushButton("☀️ Brief", self.full_widget)
         self.brief_btn.clicked.connect(self.action_brief)
         self.analyze_btn = QPushButton("👁 Analyze", self.full_widget)
         self.analyze_btn.clicked.connect(self.action_analyze)
-        
         btn_grid1.addWidget(self.talk_btn)
         btn_grid1.addWidget(self.brief_btn)
         btn_grid1.addWidget(self.analyze_btn)
         layout.addLayout(btn_grid1)
-        
+
         btn_grid2 = QHBoxLayout()
+        btn_grid2.setSpacing(4)
         self.dash_btn = QPushButton("📋 Dashboard", self.full_widget)
         self.dash_btn.clicked.connect(self.action_dashboard)
-        
-        self.wake_word_btn = QPushButton("🔴 Wake Word", self.full_widget)
+        self.wake_word_btn = QPushButton("⚫ Wake Word", self.full_widget)
         self.wake_word_btn.setObjectName("wakeWordBtn")
         self.wake_word_btn.clicked.connect(self.action_wake_word_toggle)
-        
         btn_grid2.addWidget(self.dash_btn)
         btn_grid2.addWidget(self.wake_word_btn)
         layout.addLayout(btn_grid2)
 
-        # Input Box
+        # ── Input box ──────────────────────────────────────────────────────
         self.task_input = QLineEdit(self.full_widget)
         self.task_input.setObjectName("taskInput")
         self.task_input.setPlaceholderText("Type a task and press Enter...")
         self.task_input.returnPressed.connect(self.action_submit_task)
         layout.addWidget(self.task_input)
 
-        # Scrollable Response Area
+        # ── Response area (takes all remaining space) ──────────────────────
         self.scroll_area = QScrollArea(self.full_widget)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setObjectName("scrollArea")
@@ -157,9 +164,9 @@ class PresenceWindow(QWidget):
         self.response_label.setObjectName("infoLabel")
         self.response_label.setWordWrap(True)
         self.response_label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        
+
         self.scroll_area.setWidget(self.response_label)
-        layout.addWidget(self.scroll_area)
+        layout.addWidget(self.scroll_area, 1)  # stretch=1: grows to fill remaining space
 
     def action_submit_task(self):
         text = self.task_input.text().strip()
@@ -283,8 +290,8 @@ class PresenceWindow(QWidget):
     def _on_data_fetched(self, result: dict):
         if result["success"]:
             data = result["data"]
-            w_name = data.get("workspace", {}).get("name", "Jarvis")
-            pending_count = len(data.get("tasks", []))
+            w_name = (data.get("workspace") or {}).get("name", "Jarvis")
+            pending_count = len(data.get("tasks") or [])
             
             self.workspace_label.setText(f"Workspace: {w_name}")
             self.pending_label.setText(f"Pending: {pending_count}")
@@ -293,11 +300,8 @@ class PresenceWindow(QWidget):
             self.title_label.setText("JARVIS ACTIVE")
             self.mini_label.setText("🟢 J")
             
-            wake = data.get("wake_word", {})
-            if wake.get("enabled", False):
-                self.wake_word_btn.setText("🟢 Wake Word")
-            else:
-                self.wake_word_btn.setText("🔴 Wake Word")
+            wake = data.get("wake_word") or {}
+            self._sync_wake_word_btn(wake.get("enabled", False))
                 
             self._set_buttons_enabled(True)
             self.is_backend_online = True
@@ -311,6 +315,13 @@ class PresenceWindow(QWidget):
             # Recheck later
             QTimer.singleShot(60000, self.fetch_data)
 
+    def _sync_wake_word_btn(self, enabled: bool):
+        """Single place to set wake word button label + style."""
+        if enabled:
+            self.wake_word_btn.setText("🟢 Wake Word")
+        else:
+            self.wake_word_btn.setText("⚫ Wake Word")
+
     def _set_buttons_enabled(self, enabled: bool):
         self.talk_btn.setEnabled(enabled)
         self.brief_btn.setEnabled(enabled)
@@ -318,13 +329,71 @@ class PresenceWindow(QWidget):
         self.dash_btn.setEnabled(enabled)
         self.wake_word_btn.setEnabled(enabled)
 
+    # ── Wake Word Status Polling ───────────────────────────────────────────────
+
+    def _fetch_wake_status(self):
+        """Poll /api/wake-word/status every 2s in a background thread."""
+        import threading
+        threading.Thread(target=self._wake_status_thread, daemon=True).start()
+
+    def _wake_status_thread(self):
+        try:
+            import urllib.request, json
+            req = urllib.request.Request(f"{API_URL}/api/wake-word/status")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                data = json.loads(resp.read().decode())
+            QTimer.singleShot(0, lambda: self._on_wake_status(data))
+        except Exception:
+            pass  # silently skip — server may not be running
+
+    def _on_wake_status(self, data: dict):
+        """Update status bar + append new wake-word conversations to response area."""
+        state = data.get("state", "unavailable")
+
+        # Update the status bar label
+        _state_display = {
+            "off":          "⚫  Wake Word: Off",
+            "listening":    "🎤  Wake Word: Listening...",
+            "processing":   "⚙️  Wake Word: Processing...",
+            "unavailable":  "⚫  Wake Word: Unavailable",
+        }
+        self.wake_status_label.setText(_state_display.get(state, "⚫  Wake Word"))
+
+        # Also sync the toggle button appearance
+        if state in ("listening", "processing"):
+            self._sync_wake_word_btn(True)
+        elif state == "off":
+            self._sync_wake_word_btn(False)
+
+        # Append any new wake-word interactions to the response area
+        history = data.get("history", [])
+        new_count = len(history)
+        if new_count > self._last_history_count:
+            new_entries = history[self._last_history_count:]
+            self._last_history_count = new_count
+            current = self.response_label.text()
+            for entry in new_entries:
+                t = entry.get("time", "")
+                if entry.get("type") == "greeting":
+                    line = f"[{t}] 🤖 {entry.get('response', '')}"
+                elif entry.get("type") == "command":
+                    line = f"[{t}] 🎙 {entry.get('command', '')}\n      🤖 {entry.get('response', '')}"
+                else:
+                    line = f"[{t}] ⚠️ {entry.get('response', '')}"
+                current = (current + "\n" + line).strip()
+            self.response_label.setText(current)
+            bar = self.scroll_area.verticalScrollBar()
+            bar.setValue(bar.maximum())
+
     def showEvent(self, event):
         self.fetch_data()
         self.refresh_timer.start()
+        self.wake_status_timer.start()
         super().showEvent(event)
-        
+
     def hideEvent(self, event):
         self.refresh_timer.stop()
+        self.wake_status_timer.stop()
         self._track("presence_hide")
         super().hideEvent(event)
 
@@ -396,10 +465,7 @@ class PresenceWindow(QWidget):
                     is_enabled = data.get("enabled", False)
                     def _update_ui():
                         self.wake_word_btn.setEnabled(True)
-                        if is_enabled:
-                            self.wake_word_btn.setText("🟢 Wake Word")
-                        else:
-                            self.wake_word_btn.setText("🔴 Wake Word")
+                        self._sync_wake_word_btn(is_enabled)
                     QTimer.singleShot(0, _update_ui)
             except Exception as e:
                 def _fail():

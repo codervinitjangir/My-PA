@@ -10,7 +10,6 @@ import threading
 from config import CHATS_DATA_DIR, MAX_CHAT_HISTORY_TURNS, GROQ_API_KEYS
 from app.models import ChatMessage
 from app.services.groq_service import GroqService
-from app.services.realtime_service import RealtimeGroqService
 from app.services.brain_service import BrainService
 from app.services.task_executor import TaskExecutor
 from app.services.vision_service import VisionService
@@ -28,14 +27,12 @@ class ChatService:
     def __init__(
         self,
         groq_service: GroqService,
-        realtime_service: RealtimeGroqService = None,
         brain_service: BrainService = None,
         task_executor: TaskExecutor = None,
         vision_service: VisionService = None,
         task_manager: TaskManager = None,
     ):
         self.groq_service = groq_service
-        self.realtime_service = realtime_service
         self.brain_service = brain_service
         self.task_executor = task_executor
         self.vision_service = vision_service
@@ -208,8 +205,6 @@ class ChatService:
         return response
 
     def process_realtime_message(self, session_id: str, user_message: str) -> str:
-        if not self.realtime_service:
-            raise ValueError("Realtime service is not initialized. Cannot process realtime queries.")
 
         logger.info(
             "[REALTIME] Session: %s | User: %.200s", 
@@ -228,10 +223,11 @@ class ChatService:
 
         _, chat_idx = get_next_key_pair(len(GROQ_API_KEYS), need_brain=False)
         
-        response = self.realtime_service.get_response(
+        response = self.groq_service.get_response(
             question=user_message, 
             chat_history=chat_history, 
-            key_start_index=chat_idx
+            key_start_index=chat_idx,
+            use_search=True
         )
 
         self.add_message(session_id, "assistant", response)
@@ -333,9 +329,6 @@ class ChatService:
         session_id: str, 
         user_message: str
     ) -> Iterator[Union[str, Dict[str, Any]]]:
-        
-        if not self.realtime_service:
-            raise ValueError("Realtime service is not initialized.")
 
         logger.info(
             "[REALTIME-STREAM] Session: %s | User: %.200s", 
@@ -379,10 +372,11 @@ class ChatService:
         t0 = time.perf_counter()
 
         try:
-            for chunk in self.realtime_service.stream_response(
+            for chunk in self.groq_service.stream_response(
                 question=user_message, 
                 chat_history=chat_history, 
-                key_start_index=chat_idx
+                key_start_index=chat_idx,
+                use_search=True
             ):
                 if isinstance(chunk, dict):
                     yield chunk
@@ -459,12 +453,10 @@ class ChatService:
             return ("realtime", [], "No brain service", 0)
 
         def _run_search():
-            if self.realtime_service:
-                return self.realtime_service.prefetch_web_search(
-                    clean_user_message, 
-                    chat_history
-                )
-            return ("", None)
+            return self.groq_service.prefetch_web_search(
+                clean_user_message, 
+                chat_history
+            )
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             future_brain = executor.submit(_run_brain)
@@ -709,10 +701,7 @@ class ChatService:
                 )
 
             else:
-                if not self.realtime_service:
-                    raise ValueError("Realtime service not initialized.")
-
-                stream = self.realtime_service.stream_response_with_prefetched(
+                stream = self.groq_service.stream_response_with_prefetched(
                     question=clean_user_message,
                     chat_history=chat_history,
                     formatted_results=formatted_results,

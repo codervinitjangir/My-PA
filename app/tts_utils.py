@@ -63,6 +63,9 @@ def generate_tts_bytes(text: str, voice: str, rate: str) -> bytes:
     return asyncio.run(_edge_tts())
 
 
+_TTS_ALIAS = "jarvis_local_tts"  # shared alias — stop() can always find the active device
+
+
 def play_audio_locally(audio_bytes: bytes) -> None:
     """
     Play audio bytes on the local machine speakers.
@@ -82,10 +85,9 @@ def play_audio_locally(audio_bytes: bytes) -> None:
         if platform.system() == "Windows":
             import ctypes
             winmm = ctypes.windll.winmm
-            alias = "jarvis_local_tts"
-            winmm.mciSendStringW(f'open "{tmp}" type mpegvideo alias {alias}', None, 0, None)
-            winmm.mciSendStringW(f'play {alias} wait', None, 0, None)
-            winmm.mciSendStringW(f'close {alias}', None, 0, None)
+            winmm.mciSendStringW(f'open "{tmp}" type mpegvideo alias {_TTS_ALIAS}', None, 0, None)
+            winmm.mciSendStringW(f'play {_TTS_ALIAS} wait', None, 0, None)
+            winmm.mciSendStringW(f'close {_TTS_ALIAS}', None, 0, None)
         else:
             # Linux / macOS fallback — requires 'mpg123' or similar on PATH
             import subprocess
@@ -99,3 +101,21 @@ def play_audio_locally(audio_bytes: bytes) -> None:
                 os.unlink(tmp)
             except Exception:
                 pass
+
+
+def stop_local_tts() -> None:
+    """
+    Interrupt any currently playing local TTS immediately.
+    Called by the wake word daemon when a new wake event fires mid-speech.
+    Safe to call even if nothing is playing — MCI ignores stop on closed devices.
+    """
+    import platform
+    if platform.system() != "Windows":
+        return
+    try:
+        import ctypes
+        winmm = ctypes.windll.winmm
+        winmm.mciSendStringW(f'stop {_TTS_ALIAS}',  None, 0, None)
+        winmm.mciSendStringW(f'close {_TTS_ALIAS}', None, 0, None)
+    except Exception:
+        pass  # device may not exist — that's fine
