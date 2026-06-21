@@ -39,6 +39,9 @@ from app.services.vision_service import VisionService
 from app.services.task_manager import TaskManager
 from app.services.stt_service import STTService
 
+import app.tools   # Core OS tools
+import app.plugins # Third-party / fun plugins
+
 from config import (
     VECTOR_STORE_DIR, GROQ_API_KEYS, GROQ_MODEL, TAVILY_API_KEY,
     EMBEDDING_MODEL, CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHAT_HISTORY_TURNS,
