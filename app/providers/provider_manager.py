@@ -1,6 +1,8 @@
 from typing import Dict
 from app.providers.base_provider import BaseProvider
 from app.providers.groq_provider import GroqProvider
+from app.providers.openai_provider import OpenAIProvider
+from app.providers.gemini_provider import GeminiProvider
 from app.services.vector_store import VectorStoreService
 
 class ProviderManager:
@@ -11,8 +13,10 @@ class ProviderManager:
         self.vector_store = vector_store_service
         self.providers: Dict[str, BaseProvider] = {}
         
-        # Initialize default provider
+        # Initialize providers
         self.providers["groq"] = GroqProvider(vector_store_service)
+        self.providers["openai"] = OpenAIProvider(vector_store_service)
+        self.providers["gemini"] = GeminiProvider(vector_store_service)
         self.default_provider = "groq"
 
     def get_provider(self, name: str = None) -> BaseProvider:

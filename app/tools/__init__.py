@@ -1,11 +1,5 @@
 from app.tools.registry import ToolRegistry
-from app.tools.image_tool import ImageGenerationTool
-from app.tools.desktop_tool import DesktopAppTool
-from app.tools.mcp_client import MCPClientTool
-from app.tools.browser_tool import AdvancedBrowserTool
+from app.tools.base_tool import BaseTool
 
-# Register core tools
-ToolRegistry.register(ImageGenerationTool())
-ToolRegistry.register(DesktopAppTool())
-ToolRegistry.register(MCPClientTool())
-ToolRegistry.register(AdvancedBrowserTool())
+# Dynamically load all tool plugins inside this directory
+ToolRegistry.load_tools(__name__)
