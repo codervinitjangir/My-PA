@@ -78,7 +78,8 @@ class VectorStoreService:
                 chat_content = "\n".join(lines)
 
                 if chat_content.strip():
-                    documents.append(Document(page_content=chat_content, metadata={"source": f"chat_{file_path.stem}"}))
+                    ts = file_path.stat().st_mtime
+                    documents.append(Document(page_content=chat_content, metadata={"source": f"chat_{file_path.stem}", "timestamp": ts}))
                     logger.info(f"[VECTOR] Loaded chat history: %s (%d messages)", file_path.name, len(messages))
 
             except Exception as e:
@@ -128,3 +129,37 @@ class VectorStoreService:
         if k not in self._retriever_cache:
             self._retriever_cache[k] = self.vector_store.as_retriever(search_kwargs={"k": k})
         return self._retriever_cache[k]
+
+    def search_with_temporal_bias(self, query: str, k: int = 4) -> List[Document]:
+        """
+        Mem0 Concept: Temporal Reasoning.
+        Fetches semantic matches and reranks them, boosting recent memories.
+        """
+        if not self.vector_store:
+            return []
+            
+        # Fetch 2x documents for reranking
+        docs_and_scores = self.vector_store.similarity_search_with_score(query, k=k*2)
+        
+        import time
+        now = time.time()
+        
+        scored_docs = []
+        for doc, score in docs_and_scores:
+            ts = doc.metadata.get("timestamp", 0)
+            
+            # FAISS returns L2 distance (lower is better)
+            # Default unknown timestamps to 1 year old
+            age_seconds = now - ts if ts > 0 else 86400 * 365
+            
+            # Decay factor: Penalize older memories
+            age_weeks = age_seconds / (86400 * 7)
+            temporal_score = score + (age_weeks * 0.05)
+            
+            scored_docs.append((temporal_score, doc))
+            
+        # Sort by temporally penalized score
+        scored_docs.sort(key=lambda x: x[0])
+        
+        logger.info(f"[VECTOR] Temporal search retrieved {k} reranked documents.")
+        return [doc for score, doc in scored_docs[:k]]
