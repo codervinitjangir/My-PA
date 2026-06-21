@@ -11,6 +11,7 @@ from app.services.decision_types import (
     INTENT_GENERATE_IMAGE, INTENT_CONTENT,
     INTENT_GOOGLE_SEARCH, INTENT_YOUTUBE_SEARCH, INTENT_CHAT,
 )
+from app.tools.registry import ToolRegistry
 
 logger = logging.getLogger("J.A.R.V.I.S")
 
@@ -102,12 +103,9 @@ class TaskExecutor:
                     if tag == "wopen" and result:
                         if result.startswith("app:"):
                             app_target = result[4:]
-                            import os
-                            try:
-                                os.startfile(app_target)
+                            tool = ToolRegistry.get_tool("open_desktop_app")
+                            if tool.execute(app_target=app_target):
                                 response.desktop_apps.append(app_target)
-                            except Exception as e:
-                                logger.error(f"[TASK] Failed to open desktop app {app_target}: {e}")
                         else:
                             response.wopens.append(result)
                         
@@ -273,46 +271,8 @@ class TaskExecutor:
     def _do_generate_image(self, payload: dict) -> Optional[tuple]:
         """Returns (pollinations_url, image_bytes) or None on failure."""
         prompt = (payload.get("prompt", payload.get("message", "")) or "").strip()
-        
-        if len(prompt) < 3:
-            logger.warning("[TASK] Image prompt too short (< 3 chars)")
-            return None
-            
-        prompt = prompt[:4000]
-        t0 = time.perf_counter()
-        
-        result = self._generate_pollinations(prompt)
-        
-        if result:
-            logger.info("[TASK] Pollinations image downloaded in %.2fs", time.perf_counter() - t0)
-            return result
-            
-        logger.warning("[TASK] Image generation failed")
-        return None
-
-    def _generate_pollinations(self, prompt: str) -> Optional[tuple]:
-        """Download the generated image and return (url, bytes), or None on failure."""
-        import httpx
-        encoded_prompt = quote(prompt, safe='')
-        api_url = (
-            f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-            f"?model=flux&width=1024&height=1024&nologo=true&private=true&enhance=true&safe=false"
-        )
-        logger.info("[TASK] Fetching Pollinations image: %s", api_url[:120])
-        for attempt in range(3):
-            try:
-                with httpx.Client(timeout=60, follow_redirects=True) as client:
-                    resp = client.get(api_url)
-                    if resp.status_code == 200 and resp.content:
-                        content_type = resp.headers.get("content-type", "")
-                        if "image" in content_type or len(resp.content) > 1000:
-                            logger.info("[TASK] Pollinations image fetched (%d bytes)", len(resp.content))
-                            return (api_url, resp.content)
-                        logger.warning("[TASK] Pollinations attempt %d: status=%d", attempt + 1, resp.status_code)
-            except Exception as e:
-                logger.warning("[TASK] Pollinations attempt %d failed: %s", attempt + 1, e)
-            time.sleep(2)
-        return None
+        tool = ToolRegistry.get_tool("generate_image")
+        return tool.execute(prompt=prompt)
 
     def _do_content(self, payload: dict, chat_history: Optional[List[tuple]] = None) -> Optional[str]:
         prompt = (payload.get("prompt", payload.get("message", "")) or "").strip()
