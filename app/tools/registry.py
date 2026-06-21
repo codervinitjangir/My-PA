@@ -29,6 +29,28 @@ class ToolRegistry:
         return {name: tool.description for name, tool in cls._tools.items()}
 
     @classmethod
+    def get_relevant_tools(cls, query: str, top_k: int = 3) -> Dict[str, BaseTool]:
+        """
+        Semantic tool filtering (ISAIR MCP pattern).
+        Returns the top_k most relevant tools based on the query to prevent LLM context rot.
+        Currently uses heuristic keyword matching, ready for local embeddings.
+        """
+        query_lower = query.lower()
+        scored_tools = []
+        for name, tool in cls._tools.items():
+            score = 0
+            if name.lower() in query_lower:
+                score += 5
+            for word in tool.description.lower().split():
+                if len(word) > 3 and word in query_lower:
+                    score += 1
+            scored_tools.append((score, name, tool))
+            
+        scored_tools.sort(key=lambda x: x[0], reverse=True)
+        # If no tools matched, return empty dict or top generic tools
+        return {name: tool for score, name, tool in scored_tools[:top_k] if score > 0}
+
+    @classmethod
     def load_tools(cls, package_name: str = "app.tools"):
         """Dynamically discovers and registers all tools in the given package."""
         logger.info(f"[TOOL REGISTRY] Loading tools from {package_name}...")

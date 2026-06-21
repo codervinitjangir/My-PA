@@ -17,10 +17,23 @@ class MemoryManager:
             "preferences": {}
         }
         
+    def _redact_pii(self, text: str) -> str:
+        """
+        Locally redacts sensitive information before it hits the vector database.
+        Pattern mapped from ISAIR's privacy-first design.
+        """
+        import re
+        # Basic email redaction
+        text = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL_REDACTED]', text)
+        # Basic credit card / phone number structure redaction
+        text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CC_REDACTED]', text)
+        return text
+        
     def add_to_long_term(self, text: str, metadata: dict = None):
         """Adds information to the vector database for long-term retention."""
-        self.vector_store.add_texts([text], [metadata] if metadata else None)
-        logger.info("[MEMORY] Added item to long-term memory.")
+        safe_text = self._redact_pii(text)
+        self.vector_store.add_texts([safe_text], [metadata] if metadata else None)
+        logger.info("[MEMORY] Added redacted item to long-term memory.")
         
     def get_context(self, query: str, k: int = 5) -> str:
         """Retrieves relevant context from the vector database."""
