@@ -435,6 +435,50 @@ class ChatService:
                 yield f"Failed to switch model: {e}"
             return
 
+        # Intercept /search_chat command
+        if clean_user_message.startswith("/search_chat "):
+            query = clean_user_message.split(" ", 1)[1].strip().lower()
+            logger.info(f"Intercepted /search_chat command for: {query}")
+            matches = []
+            for s_id, messages in self.sessions.items():
+                for msg in messages:
+                    if query in msg.content.lower():
+                        matches.append(f"- **{msg.role}**: {msg.content[:100]}...")
+            
+            if matches:
+                yield f"**Search Results:**\n" + "\n".join(matches[:10])
+            else:
+                yield "No matches found in active session history."
+            return
+            
+        # Intercept /context command
+        if clean_user_message.startswith("/context"):
+            try:
+                from app.memory.user_profile_manager import UserProfileManager
+                profile = UserProfileManager().get_profile_summary()
+                
+                context_msg = f"--- AUTOMATIC CONTEXT INJECTION ---\n{profile}\n-----------------------------------"
+                # Insert at the beginning of the session if possible, or just add as system
+                self.sessions.get(session_id, []).insert(0, ChatMessage(role="system", content=context_msg))
+                yield "Supermemory context successfully injected into the session."
+            except Exception as e:
+                yield f"Failed to inject context: {e}"
+            return
+            
+        # Intercept /rollback command
+        if clean_user_message.startswith("/rollback"):
+            try:
+                if len(self.sessions.get(session_id, [])) >= 2:
+                    self.sessions[session_id].pop()
+                    self.sessions[session_id].pop()
+                    self.save_chat_session(session_id)
+                    yield "Rolled back the last interaction successfully."
+                else:
+                    yield "Not enough history to rollback."
+            except Exception as e:
+                yield f"Failed to rollback: {e}"
+            return
+
         # Use clean message for storage and processing
         self.add_message(session_id, "user", clean_user_message)
         self.add_message(session_id, "assistant", "")
