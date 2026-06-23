@@ -170,9 +170,12 @@ async def lifespan(app: FastAPI):
         logger.info("  - Chat Service: Ready")
         
         # Wake Word Initialization
-        from jarvis_os.core.wake_word import init_wake_word_daemon
-        init_wake_word_daemon(chat_service, stt_service)
-        logger.info("  - Wake Word Daemon: Ready")
+        try:
+            from jarvis_os.core.wake_word import init_wake_word_daemon
+            init_wake_word_daemon(chat_service, stt_service)
+            logger.info("  - Wake Word Daemon: Ready")
+        except ImportError:
+            logger.warning("  - Wake Word Daemon: Module not found, skipping")
         
         logger.info("-" * 60)
         logger.info("J.A.R.V.I.S is online and ready!")
@@ -326,11 +329,15 @@ async def get_dashboard():
     data = manager.get_dashboard()
     
     # Inject wake word status
-    daemon = get_wake_word_daemon()
-    data["wake_word"] = {
-        "enabled": daemon.enabled if daemon else False,
-        "last_wake": daemon.last_wake if daemon else None
-    }
+    try:
+        from jarvis_os.core.wake_word import get_wake_word_daemon
+        daemon = get_wake_word_daemon()
+        data["wake_word"] = {
+            "enabled": daemon.enabled if daemon else False,
+            "last_wake": daemon.last_wake if daemon else None
+        }
+    except ImportError:
+        data["wake_word"] = {"enabled": False, "last_wake": None}
     return data
 
 @app.get("/mobile/state")
@@ -376,11 +383,14 @@ async def operator_action(request: OperatorActionRequest):
     from jarvis_os.desktop_action.desktop_action_manager import DesktopActionManager
     
     if request.action == "toggle_wake_word":
-        from jarvis_os.core.wake_word import get_wake_word_daemon
-        daemon = get_wake_word_daemon()
-        if daemon:
-            new_state = daemon.toggle()
-            return {"success": True, "message": "Wake Word Toggled", "enabled": new_state}
+        try:
+            from jarvis_os.core.wake_word import get_wake_word_daemon
+            daemon = get_wake_word_daemon()
+            if daemon:
+                new_state = daemon.toggle()
+                return {"success": True, "message": "Wake Word Toggled", "enabled": new_state}
+        except ImportError:
+            pass
         return {"success": False, "message": "Wake Word Daemon missing"}
         
     if request.action == "open_site":
@@ -544,8 +554,11 @@ async def health():
 @app.get("/api/wake-word/status")
 async def wake_word_status():
     """Live wake word daemon state + recent interaction history."""
-    from jarvis_os.core.wake_word import get_wake_word_daemon
-    daemon = get_wake_word_daemon()
+    try:
+        from jarvis_os.core.wake_word import get_wake_word_daemon
+        daemon = get_wake_word_daemon()
+    except ImportError:
+        daemon = None
     if not daemon:
         return {"state": "unavailable", "last_wake": None, "history": []}
 

@@ -28,13 +28,17 @@
       "presence_voice": 1,
       "wake_detected": 7,
       "wake_command_executed": 7
+    },
+    "2026-06-22": {
+      "presence_open": 1,
+      "presence_hide": 1
     }
   },
   "web_open": 0,
   "web_search": 0,
   "web_summarize": 0,
-  "presence_open": 24,
-  "presence_hide": 8,
+  "presence_open": 25,
+  "presence_hide": 9,
   "presence_brief": 12,
   "presence_dashboard": 5,
   "presence_analyze": 11,

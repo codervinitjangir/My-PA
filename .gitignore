@@ -6,3 +6,6 @@ scratch/
 *.mp3
 *.pyc
 archive/
+database/
+temp_openjarvis/
+
