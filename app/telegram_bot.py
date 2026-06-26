@@ -5,6 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 from app.plugins.calendar_tool import GoogleCalendarTool
 from app.plugins.gmail_tool import GmailSummaryTool
 import app.scheduler
+from jarvis_os.observers.screen_observer import ScreenObserver, CooldownError
 
 logger = logging.getLogger("J.A.R.V.I.S.Telegram")
 
@@ -64,9 +65,19 @@ import asyncio
 def consume_jarvis_stream(chat_service, session_id, text):
     stream = chat_service.process_jarvis_message_stream(session_id, text)
     full_response = ""
+    links = []
     for chunk in stream:
         if isinstance(chunk, str):
             full_response += chunk
+        elif isinstance(chunk, dict) and "actions" in chunk:
+            actions = chunk["actions"]
+            for key in ["wopens", "plays", "googlesearches", "youtubesearches", "images"]:
+                if actions.get(key):
+                    links.extend(actions[key])
+                    
+    if links:
+        full_response += "\n\nHere are your links:\n" + "\n".join(links)
+        
     return full_response
 
 @owner_only
@@ -84,6 +95,41 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"Error processing message: {e}")
 
+@owner_only
+async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Capture and analyze current screen, update GlobalStateManager, reply with summary."""
+    await update.message.reply_text("Analyzing your screen, Sir...")
+    try:
+        from app.services.vision_service import VisionService
+        from app.main import _state_mgr, _SCREEN_PROMPT
+
+        observer = ScreenObserver()
+        image_bytes = observer.capture_screen()
+        img_b64 = observer.sanitize_data(image_bytes)
+        del image_bytes
+
+        vision = VisionService()
+        raw_text = vision.analyze_image(prompt=_SCREEN_PROMPT, img_base64=img_b64)
+        del img_b64
+
+        screen_state = observer.parse_response(raw_text)
+        _state_mgr.update_runtime_state("screen", screen_state.model_dump())
+
+        reply = (
+            f"Screen analyzed, Sir.\n\n"
+            f"App: {screen_state.application}\n"
+            f"Activity: {screen_state.activity}\n"
+            f"Confidence: {screen_state.confidence:.0f}%\n"
+            f"Summary: {screen_state.summary}\n"
+            f"Suggestion: {screen_state.next_best_action}"
+        )
+        await update.message.reply_text(reply)
+
+    except CooldownError as e:
+        await update.message.reply_text(f"Cooldown active, Sir. {e}")
+    except Exception as e:
+        await update.message.reply_text(f"Screen analysis failed: {e}")
+
 async def start_telegram_bot(chat_service):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -97,6 +143,7 @@ async def start_telegram_bot(chat_service):
     application.add_handler(CommandHandler("brief", brief_command))
     application.add_handler(CommandHandler("cal", cal_command))
     application.add_handler(CommandHandler("mail", mail_command))
+    application.add_handler(CommandHandler("screen", screen_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     
     await application.initialize()
