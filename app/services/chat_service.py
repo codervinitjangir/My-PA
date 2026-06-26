@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import List, Optional, Dict, Iterator, Any, Union
@@ -108,7 +109,7 @@ class ChatService:
             )
             return False
 
-    import re
+
 
     def validate_session_id(self, session_id: str) -> bool:
         if not session_id or not isinstance(session_id, str):

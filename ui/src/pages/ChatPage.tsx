@@ -244,7 +244,13 @@ export const ChatPage: React.FC = () => {
 
             // Activity panel data
             if (data.activity) {
-              addActivity(data.activity.text || data.activity, data.activity.type || 'status');
+              const activityText = data.activity.text 
+                ? data.activity.text 
+                : typeof data.activity === 'object' 
+                  ? JSON.stringify(data.activity) 
+                  : String(data.activity);
+                  
+              addActivity(activityText, data.activity.type || 'status');
               if (settings.autoOpenActivity) {
                 setActivityPanelOpen(true);
               }

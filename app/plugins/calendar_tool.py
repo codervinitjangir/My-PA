@@ -51,7 +51,7 @@ class GoogleCalendarTool(BaseTool):
     name: str = "google_calendar"
     description: str = "Fetch today's calendar events and upcoming schedule from Google Calendar."
 
-    def execute(self, date: str = None, **kwargs) -> str:
+    def execute(self, date: str = None, date_string: str = None, **kwargs) -> str:
         try:
             creds = get_google_credentials()
             service = build('calendar', 'v3', credentials=creds)
@@ -59,35 +59,45 @@ class GoogleCalendarTool(BaseTool):
             tz_str = os.getenv("TIMEZONE", "Asia/Kolkata")
             tz = pytz.timezone(tz_str)
             
-            if date:
-                try:
-                    target_date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
-                except ValueError:
-                    return f"Invalid date format: {date}. Use YYYY-MM-DD."
+            query = (date_string or date or "").strip().lower()
+            
+            if query in ["future", "upcoming", "next", "later"]:
+                time_min = datetime.datetime.now(tz).isoformat()
+                time_max = None
+                display_date = "Upcoming Events"
             else:
+                import dateparser
                 target_date = datetime.datetime.now(tz).date()
+                if query and query != "today":
+                    parsed = dateparser.parse(query, settings={'TIMEZONE': tz_str, 'RETURN_AS_TIMEZONE_AWARE': False})
+                    if parsed:
+                        target_date = parsed.date()
+                
+                start_of_day = tz.localize(datetime.datetime.combine(target_date, datetime.time.min))
+                end_of_day = tz.localize(datetime.datetime.combine(target_date, datetime.time.max))
+                
+                time_min = start_of_day.isoformat()
+                time_max = end_of_day.isoformat()
+                display_date = target_date.strftime('%A, %b %d')
             
-            start_of_day = tz.localize(datetime.datetime.combine(target_date, datetime.time.min))
-            end_of_day = tz.localize(datetime.datetime.combine(target_date, datetime.time.max))
-            
-            time_min = start_of_day.isoformat()
-            time_max = end_of_day.isoformat()
-            
-            events_result = service.events().list(
-                calendarId='primary', 
-                timeMin=time_min,
-                timeMax=time_max,
-                maxResults=10, 
-                singleEvents=True,
-                orderBy='startTime'
-            ).execute()
+            kwargs = {
+                'calendarId': 'primary',
+                'timeMin': time_min,
+                'maxResults': 10,
+                'singleEvents': True,
+                'orderBy': 'startTime'
+            }
+            if time_max:
+                kwargs['timeMax'] = time_max
+                
+            events_result = service.events().list(**kwargs).execute()
             
             events = events_result.get('items', [])
             
             if not events:
-                return "No events scheduled for today, Sir."
+                return f"No events scheduled for {display_date}, Sir."
             
-            output = [f"Schedule for {target_date.strftime('%A, %b %d')}:"]
+            output = [f"Schedule for {display_date}:"]
             for event in events:
                 start = event['start'].get('dateTime', event['start'].get('date'))
                 

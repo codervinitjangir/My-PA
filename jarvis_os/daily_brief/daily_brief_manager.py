@@ -13,4 +13,12 @@ class DailyBriefManager:
         """
         global_state = self._state_mgr.build_global_state()
         state = self.builder.build_state(global_state)
+        
+        try:
+            from app.scheduler import LAST_BRIEFING
+            if LAST_BRIEFING and LAST_BRIEFING != "No briefing yet.":
+                state.today_focus = LAST_BRIEFING
+        except ImportError:
+            pass
+            
         return state.model_dump()

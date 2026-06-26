@@ -32,9 +32,9 @@ _PRIMARY_BRAIN_PROMPT = """You are the decision-maker for JARVIS. Classify the u
 Examples: "What is this?" / "What am I holding?" / "What do you see?" / "Describe what I'm showing" / "Identify this" / "What's in my hand?" / "Look at this" / "Read this" / "Can you see this?" / "Check this out"
 - Any request where the user expects you to LOOK at something through the camera → camera
 
-**task** — User wants ONLY an ACTION performed (no question to answer). Opening apps/websites, playing music/video, generating images, writing content, searching Google/YouTube, or controlling the webcam.
-Examples: "Open YouTube" / "Play despacito" / "Generate image of a cat" / "Write an essay about AI" / "Search for Python tutorials" / "Open webcam" / "Close webcam" / "Launch Netflix" / "Go to Facebook" / "Make me a picture of a sunset" / "Draw a cat" / "Create an image of mountains"
-- ANY request to open, launch, play, generate, draw, create, write, draft, compose, search, or control webcam → task
+**task** — User wants ONLY an ACTION performed (no question to answer). Opening apps/websites, playing music/video, generating images, writing content, searching Google/YouTube, checking calendar, reading emails, or controlling the webcam.
+Examples: "Open YouTube" / "Play despacito" / "Generate image of a cat" / "Write an essay about AI" / "Search for Python tutorials" / "Open webcam" / "Close webcam" / "Launch Netflix" / "Go to Facebook" / "What's on my calendar today?" / "Check my emails" / "Read my unread messages" / "Any event in future?" / "On 16 July?" / "Tomorrow?"
+- ANY request to open, launch, play, generate, draw, create, write, draft, compose, search, check calendar, read emails, or control webcam → task
 - "Open webcam" / "Turn on camera" / "Close webcam" / "Turn off camera" → task
 - Image/picture/drawing requests → task (NOT camera)
 
@@ -144,6 +144,20 @@ For multiple tasks, separate with commas: task_type1 query1, task_type2 query2
 -> 'youtube_search (search topic)' — Search on YouTube (NOT play, just search).
    "Search YouTube for cooking recipes" → youtube_search cooking recipes
    "Find videos about machine learning on YouTube" → youtube_search machine learning
+
+-> 'check_calendar (query)' — Check calendar events.
+   "What's on my calendar today?" → check_calendar today
+   "Do I have any meetings tomorrow?" → check_calendar tomorrow
+   "Any event in future?" → check_calendar future
+   "On 16 july?" → check_calendar 16 july
+   "Next week?" → check_calendar next week
+
+-> 'check_emails (query)' — Read, check, search, or manage emails.
+   "Check my emails" → check_emails
+   "Do I have any new emails?" → check_emails
+   "Delete mail from amazon" → check_emails delete mail from amazon
+   "Find emails from boss" → check_emails from boss
+   "Trash email from John" → check_emails trash from John
 
 === CONTEXTUAL CORRECTIONS ===
 When the user is correcting a previous task, use conversation history to understand the original intent:
@@ -315,7 +329,7 @@ class BrainService:
                     payload["url"] = url
                 elif task_type == "play":
                     payload["query"] = clean_query or user_message
-                elif task_type in ("google_search", "youtube_search"):
+                elif task_type in ("google_search", "youtube_search", "check_calendar", "check_emails"):
                     payload["query"] = clean_query or user_message
                 elif task_type == "generate_image":
                     payload["prompt"] = clean_query or user_message
@@ -548,6 +562,7 @@ Classify. Output EXACTLY ONE category name."""
             "google_search", "google search",
             "youtube_search", "youtube search",
             "open_webcam", "close_webcam",
+            "check_calendar", "check_emails",
             "content", "open", "close", "play",
             "general", "realtime",
         ]

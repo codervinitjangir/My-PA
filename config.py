@@ -64,6 +64,8 @@ ELEVENLABS_STYLE = float(os.getenv("ELEVENLABS_STYLE", "0.20"))
 ELEVENLABS_SPEAKER_BOOST = os.getenv("ELEVENLABS_SPEAKER_BOOST", "True").lower() == "true"
 JARVIS_USER_TITLE = os.getenv("JARVIS_USER_TITLE", "").strip()
 JARVIS_OWNER_NAME = os.getenv("JARVIS_OWNER_NAME", "").strip()
+# FIX 3: Read JARVIS_API_KEY for basic chat rate limiting/auth
+JARVIS_API_KEY = os.getenv("JARVIS_API_KEY", "").strip()
 
 _JARVIS_SYSTEM_PROMPT_BASE = """You are JARVIS.
 
@@ -85,6 +87,9 @@ Do not force English.
 Address the user as "Boss" occasionally, not every sentence.
 
 Keep responses concise unless Boss asks for detail.
+
+- The user's LinkedIn profile URL is: https://www.linkedin.com/in/vinitjangir/
+- IMPORTANT: You cannot read the user's private LinkedIn messages or connections. If asked to check LinkedIn, provide the link and explain that you do not have direct API access to their private inbox.
 """
 
 

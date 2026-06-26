@@ -10,6 +10,7 @@ from app.services.decision_types import (
     INTENT_OPEN_WEBCAM, INTENT_CLOSE_WEBCAM,
     INTENT_GENERATE_IMAGE, INTENT_CONTENT,
     INTENT_GOOGLE_SEARCH, INTENT_YOUTUBE_SEARCH, INTENT_CHAT,
+    INTENT_CHECK_CALENDAR, INTENT_CHECK_EMAILS
 )
 from app.tools.registry import ToolRegistry
 
@@ -25,6 +26,8 @@ class TaskResponse:
     googlesearches: List[str] = field(default_factory=list)
     youtubesearches: List[str] = field(default_factory=list)
     desktop_apps: List[str] = field(default_factory=list)
+    calendar_results: List[str] = field(default_factory=list)
+    email_results: List[str] = field(default_factory=list)
     cam: Optional[dict] = None
 
 class TaskExecutor:
@@ -67,6 +70,12 @@ class TaskExecutor:
                 
             elif intent_type == INTENT_YOUTUBE_SEARCH:
                 tasks.append(("youtube", self._do_youtube_search, payload))
+                
+            elif intent_type == INTENT_CHECK_CALENDAR:
+                tasks.append(("calendar", self._do_check_calendar, payload))
+                
+            elif intent_type == INTENT_CHECK_EMAILS:
+                tasks.append(("emails", self._do_check_emails, payload))
                 
             elif intent_type == INTENT_OPEN_WEBCAM:
                 response.cam = {"action": "open"}
@@ -127,8 +136,14 @@ class TaskExecutor:
                     elif tag == "google" and result:
                         response.googlesearches.append(result)
                         
-                    elif tag == "youtube" and result:
+                    elif tag == "youtube":
                         response.youtubesearches.append(result)
+                        
+                    elif tag == "calendar" and result:
+                        response.calendar_results.append(result)
+                        
+                    elif tag == "emails" and result:
+                        response.email_results.append(result)
                         
                 except Exception as e:
                     failed_tags.append(tag)
@@ -160,7 +175,7 @@ class TaskExecutor:
             parts = self.build_conversational_response(
                 response.wopens, response.plays, response.images,
                 response.contents, response.googlesearches, response.youtubesearches,
-                response.desktop_apps
+                response.desktop_apps, response.calendar_results, response.email_results
             )
             response.text = parts if parts else "All done."
             
@@ -201,9 +216,17 @@ class TaskExecutor:
         googlesearches: List[str],
         youtubesearches: List[str],
         desktop_apps: List[str] = None,
+        calendar_results: List[str] = None,
+        email_results: List[str] = None,
     ) -> str:
         
         parts = []
+        
+        if calendar_results:
+            parts.extend(calendar_results)
+            
+        if email_results:
+            parts.extend(email_results)
         
         if desktop_apps:
             names = [app.split(".")[0].title() for app in desktop_apps]
@@ -313,3 +336,21 @@ class TaskExecutor:
         if not query:
             return "https://www.youtube.com"
         return f"https://www.youtube.com/results?search_query={quote(query, safe='')}"
+
+    def _do_check_calendar(self, payload: dict) -> Optional[str]:
+        query = (payload.get("query", payload.get("message", "")) or "").strip()
+        tool = ToolRegistry.get_tool("google_calendar")
+        try:
+            return str(tool.execute(date_string=query))
+        except Exception as e:
+            logger.error("[TASK] Calendar error: %s", e)
+            return "I had trouble accessing your calendar."
+
+    def _do_check_emails(self, payload: dict) -> Optional[str]:
+        query = (payload.get("query", payload.get("message", "")) or "").strip()
+        tool = ToolRegistry.get_tool("gmail_summary")
+        try:
+            return str(tool.execute(query=query))
+        except Exception as e:
+            logger.error("[TASK] Gmail error: %s", e)
+            return "I had trouble accessing your emails."

@@ -808,10 +808,6 @@ async def get_task_status(task_id: str):
     if not task_id or len(task_id) > 32:
         raise HTTPException(status_code=400, detail="Invalid task_id")
         
-@app.get("/briefing")
-async def get_briefing():
-    return {"briefing": scheduler_module.LAST_BRIEFING}
-    
     data = task_manager.get_serializable(task_id)
     
     if not data:
