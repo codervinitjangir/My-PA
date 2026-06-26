@@ -29,12 +29,39 @@ class ToolRegistry:
         return {name: tool.description for name, tool in cls._tools.items()}
 
     @classmethod
-    def get_relevant_tools(cls, query: str, top_k: int = 3) -> Dict[str, BaseTool]:
+    def get_relevant_tools(cls, query: str, top_k: int = 3, embeddings=None) -> Dict[str, BaseTool]:
         """
         Semantic tool filtering (ISAIR MCP pattern).
-        Returns the top_k most relevant tools based on the query to prevent LLM context rot.
-        Currently uses heuristic keyword matching, ready for local embeddings.
+        Returns the top_k most relevant tools based on the query.
+        Uses embeddings if provided, otherwise falls back to keyword matching.
         """
+        if embeddings:
+            import numpy as np
+            from numpy.linalg import norm
+            
+            tool_names = list(cls._tools.keys())
+            if not tool_names:
+                return {}
+                
+            tool_descriptions = [f"{t.name}: {t.description}" for t in cls._tools.values()]
+            
+            try:
+                query_emb = embeddings.embed_query(query)
+                tool_embs = embeddings.embed_documents(tool_descriptions)
+                
+                scored_tools = []
+                for i, name in enumerate(tool_names):
+                    a = np.array(query_emb)
+                    b = np.array(tool_embs[i])
+                    score = np.dot(a, b) / (norm(a) * norm(b))
+                    scored_tools.append((score, name, cls._tools[name]))
+                
+                scored_tools.sort(key=lambda x: x[0], reverse=True)
+                return {name: tool for score, name, tool in scored_tools[:top_k] if score > 0.4} # threshold
+            except Exception as e:
+                logger.warning(f"[TOOL REGISTRY] Embedding search failed: {e}. Falling back to keywords.")
+                
+        # Fallback keyword matching
         query_lower = query.lower()
         scored_tools = []
         for name, tool in cls._tools.items():
@@ -47,7 +74,6 @@ class ToolRegistry:
             scored_tools.append((score, name, tool))
             
         scored_tools.sort(key=lambda x: x[0], reverse=True)
-        # If no tools matched, return empty dict or top generic tools
         return {name: tool for score, name, tool in scored_tools[:top_k] if score > 0}
 
     @classmethod

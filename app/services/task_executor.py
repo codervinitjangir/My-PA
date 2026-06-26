@@ -29,9 +29,14 @@ class TaskResponse:
 
 class TaskExecutor:
 
+    # FIX 2: Move executor to class level with max_workers=6 to avoid thread leak
     def __init__(self, groq_service=None):
         self.groq_service = groq_service
+        self._executor = ThreadPoolExecutor(max_workers=6)
         logger.info("[TASK] TaskExecutor initialized (Pollinations.ai for images)")
+
+    def shutdown(self):
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
     def execute(
         self,
@@ -88,15 +93,16 @@ class TaskExecutor:
         t0 = time.perf_counter()
         failed_tags = []
         
-        executor = ThreadPoolExecutor(max_workers=min(6, len(tasks)))
         try:
+            # FIX 2: Reuse class-level executor instead of creating new ones
             futures = {
-                executor.submit(fn, p): (tag, fn, p)
+                self._executor.submit(fn, p): (tag, fn, p)
                 for tag, fn, p in tasks
             }
             
-            for future in as_completed(futures, timeout=TASK_EXECUTION_TIMEOUT):
-                tag, fn, payload = futures[future]
+            try:
+                for future in as_completed(futures, timeout=TASK_EXECUTION_TIMEOUT):
+                    tag, fn, payload = futures[future]
                 
                 try:
                     result = future.result()
@@ -136,17 +142,16 @@ class TaskExecutor:
                     elif not response.text:
                         response.text = f"Something went wrong with that task: {err_msg}"
                         
+            finally:
+                # FIX 2: Cancel pending futures to avoid leaking threads if an error/timeout occurs
+                for future in futures:
+                    future.cancel()
+                        
         except FuturesTimeoutError:
             logger.warning("[TASK] Task execution timed out after %ds", TASK_EXECUTION_TIMEOUT)
             
             if not response.text:
                 response.text = "Some tasks took too long. Please try again."
-        finally:
-            try:
-                executor.shutdown(wait=False, cancel_futures=True)
-            except TypeError:
-                # Fallback for Python < 3.9
-                executor.shutdown(wait=False)
                 
         elapsed = time.perf_counter() - t0
         logger.info("[TASK] Executed %d tasks in %.2fs (failed: %s)", len(tasks), elapsed, failed_tags or "none")

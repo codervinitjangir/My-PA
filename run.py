@@ -36,12 +36,16 @@ if __name__ == "__main__":
     _validate_startup()
     _ensure_thinking_audio()
 
+    import os
     try:
+        # FIX 4: Remove hardcoded reload=True to avoid production overhead
+        ENV = os.getenv("ENV", "development")
+        reload = (ENV != "production")
         uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
+            "app.main:app",
+            host="0.0.0.0",
+            port=8000,
+            reload=reload
         )
 
     except OSError as e:

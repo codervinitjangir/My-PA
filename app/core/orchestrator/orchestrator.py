@@ -26,10 +26,22 @@ class Orchestrator:
         """
         category, task_types, method, elapsed_ms = self.brain.classify(message, chat_history)
         
-        # Example of how an orchestrator could intercept specific types:
-        # if category == "realtime" and "deep research" in message.lower():
-        #     result = self.agents["research_agent"].run(message, {"chat_history": chat_history})
-        #     return {"intercepted": True, "result": result}
+        # Intercept deep research requests
+        if category == "realtime" and any(k in message.lower() for k in ["deep research", "comprehensive research", "deep dive"]):
+            if "research_agent" in self.agents:
+                try:
+                    logger.info("[ORCHESTRATOR] Routing to DeepResearchAgent")
+                    result = self.agents["research_agent"].run(message, {"chat_history": chat_history})
+                    return {
+                        "intercepted": True,
+                        "result": result,
+                        "category": category,
+                        "task_types": task_types,
+                        "method": method,
+                        "elapsed_ms": elapsed_ms
+                    }
+                except Exception as e:
+                    logger.error(f"[ORCHESTRATOR] DeepResearchAgent failed: {e}")
         
         return {
             "intercepted": False,

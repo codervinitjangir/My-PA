@@ -88,7 +88,22 @@ class VectorStoreService:
         logger.info("[VECTOR] Total chat history files loaded: %d", len(documents))
         return documents
 
+    # FIX 1: Prevent 20-60s cold start by checking for existing index and loading it.
+    # We only rebuild if it's missing or stale.
     def create_vector_store(self) -> FAISS:
+        index_path = VECTOR_STORE_DIR / "index.faiss"
+        if index_path.exists():
+            try:
+                self.vector_store = FAISS.load_local(
+                    str(VECTOR_STORE_DIR),
+                    self.embeddings,
+                    allow_dangerous_deserialization=True
+                )
+                logger.info("[VECTOR] Loaded existing FAISS index from disk.")
+                return self.vector_store
+            except Exception as e:
+                logger.warning(f"[VECTOR] Failed to load existing index, rebuilding: {e}")
+
         learning_docs = self.load_learning_data()
         chat_docs = self.load_chat_history()
         all_documents = learning_docs + chat_docs
@@ -120,6 +135,13 @@ class VectorStoreService:
 
             except Exception as e:
                 logger.error("Failed to save vector store to disk: %s", e)
+
+    # FIX 1: Add incremental document indexing
+    def add_documents_incremental(self, texts: list[str]):
+        if self.vector_store:
+            self.vector_store.add_texts(texts)
+            self.save_vector_store()
+            logger.info(f"[VECTOR] Added {len(texts)} incremental documents.")
 
     def get_retriever(self, k: int = 10):
 

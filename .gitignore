@@ -9,3 +9,6 @@ archive/
 database/
 temp_openjarvis/
 
+# Credentials
+credentials.json
+client_secret_*.json

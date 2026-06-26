@@ -9,7 +9,7 @@ import threading
 
 from config import CHATS_DATA_DIR, MAX_CHAT_HISTORY_TURNS, GROQ_API_KEYS
 from app.models import ChatMessage
-from app.services.groq_service import GroqService
+from app.providers.groq_provider import GroqProvider as GroqService
 from app.services.brain_service import BrainService
 from app.core.orchestrator.orchestrator import Orchestrator
 from app.services.task_executor import TaskExecutor
@@ -42,6 +42,30 @@ class ChatService:
         self.orchestrator = orchestrator
         self.sessions: Dict[str, List[ChatMessage]] = {}
         self._save_lock = threading.Lock()
+
+    def update_vector_store_live(self, session_id: str):
+        vss = getattr(self.groq_service, 'vector_store_service', None)
+        if not vss or not vss.vector_store:
+            return
+            
+        messages = self.sessions.get(session_id, [])
+        if len(messages) >= 2:
+            last_user = messages[-2]
+            last_assistant = messages[-1]
+            if last_user.role == "user" and last_assistant.role == "assistant":
+                chat_content = f"User: {last_user.content}\nAssistant: {last_assistant.content}"
+                if chat_content.strip():
+                    from langchain_core.documents import Document
+                    import time
+                    ts = time.time()
+                    safe_session_id = session_id.replace("-", "").replace(".", "_")
+                    doc = Document(page_content=chat_content, metadata={"source": f"chat_{safe_session_id}", "timestamp": ts})
+                    try:
+                        vss.vector_store.add_documents([doc])
+                        vss.save_vector_store()
+                        logger.info(f"[VECTOR] Live indexed new chat turn for session {session_id[:12]}")
+                    except Exception as e:
+                        logger.warning(f"Failed to update vector store live: {e}")
 
     def load_session_from_disk(self, session_id: str) -> bool:
         safe_session_id = session_id.replace("-", "").replace(".", "_")
@@ -84,16 +108,13 @@ class ChatService:
             )
             return False
 
+    import re
+
     def validate_session_id(self, session_id: str) -> bool:
-        if not session_id or not session_id.strip():
+        if not session_id or not isinstance(session_id, str):
             return False
-        if "\0" in session_id:
-            return False
-        if ".." in session_id or "/" in session_id or "\\" in session_id:
-            return False
-        if len(session_id) > 255:
-            return False
-        return True
+        # Enforce strict UUID4 format
+        return bool(re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', session_id, re.IGNORECASE))
 
     def get_or_create_session(self, session_id: Optional[str] = None) -> str:
         t0 = time.perf_counter()
@@ -205,6 +226,8 @@ class ChatService:
             response
         )
         
+        self.save_chat_session(session_id)
+        self.update_vector_store_live(session_id)
         return response
 
     def process_realtime_message(self, session_id: str, user_message: str) -> str:
@@ -241,6 +264,8 @@ class ChatService:
             response
         )
         
+        self.save_chat_session(session_id)
+        self.update_vector_store_live(session_id)
         return response
 
     def process_message_stream(
@@ -326,6 +351,7 @@ class ChatService:
                 len(final_response)
             )
             self.save_chat_session(session_id)
+            self.update_vector_store_live(session_id)
 
     def process_realtime_message_stream(
         self, 
@@ -411,6 +437,7 @@ class ChatService:
                 len(final_response)
             )
             self.save_chat_session(session_id)
+            self.update_vector_store_live(session_id)
 
     def process_jarvis_message_stream(
         self, 
@@ -808,6 +835,7 @@ class ChatService:
                 len(final_response)
             )
             self.save_chat_session(session_id)
+            self.update_vector_store_live(session_id)
 
     def save_chat_session(self, session_id: str, log_timing: bool = True):
         if session_id not in self.sessions or not self.sessions[session_id]:

@@ -16,6 +16,9 @@ import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import edge_tts
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from app.models import ChatRequest, ChatResponse, TTSRequest
 from pydantic import BaseModel
 from typing import Optional
@@ -31,7 +34,7 @@ def _is_rate_limit_error(exc: Exception) -> bool:
     return "429" in str(exc) or "rate limit" in msg or "tokens per day" in msg
 
 from app.services.vector_store import VectorStoreService
-from app.services.groq_service import GroqService, AllGroqApisFailedError
+from app.providers.groq_provider import GroqProvider as GroqService, AllGroqApisFailedError
 from app.services.chat_service import ChatService
 from app.services.brain_service import BrainService
 from app.services.task_executor import TaskExecutor
@@ -41,6 +44,8 @@ from app.services.stt_service import STTService
 
 import app.tools   # Core OS tools
 import app.plugins # Third-party / fun plugins
+from app.scheduler import init_scheduler, shutdown_scheduler, LAST_BRIEFING
+import app.scheduler as scheduler_module
 
 from config import (
     VECTOR_STORE_DIR, GROQ_API_KEYS, GROQ_MODEL, TAVILY_API_KEY,
@@ -139,6 +144,18 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing Vision service (Groq)...")
         vision_service = VisionService()
         logger.info("Vision service initialized successfully")
+        
+        logger.info("Initializing background scheduler...")
+        init_scheduler(groq_service)
+        logger.info("Initializing Orchestrator and Agents...")
+        from app.core.orchestrator.orchestrator import Orchestrator
+        from app.agents.research_agent import DeepResearchAgent
+        
+        orchestrator = Orchestrator(brain_service)
+        research_agent = DeepResearchAgent(groq_service)
+        orchestrator.register_agent(research_agent)
+        logger.info("Orchestrator initialized successfully")
+
         logger.info("Initializing chat service...")
 
         chat_service = ChatService(
@@ -146,6 +163,7 @@ async def lifespan(app: FastAPI):
             task_executor=task_executor,
             vision_service=vision_service,
             task_manager=task_manager,
+            orchestrator=orchestrator,
         )
 
         from jarvis_os.core.operator_runtime import OperatorRuntime
@@ -201,6 +219,12 @@ async def lifespan(app: FastAPI):
                 task_manager.shutdown()
             except Exception as e:
                 logger.error(f"Error shutting down task manager: {e}")
+                
+        if task_executor:
+            try:
+                task_executor.shutdown()
+            except Exception as e:
+                logger.error(f"Error shutting down task executor: {e}")
             
         try:
             from jarvis_os.core.wake_word import shutdown_wake_word_daemon
@@ -214,6 +238,11 @@ async def lifespan(app: FastAPI):
                     chat_service.save_chat_session(session_id)
                 except Exception as e:
                     logger.error(f"Error saving session {session_id}: {e}")
+
+        try:
+            shutdown_scheduler()
+        except Exception as e:
+            logger.error(f"Error shutting down scheduler: {e}")
 
         logger.info("All sessions saved. Goodbye!")
 
@@ -233,6 +262,10 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None
 )
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Singleton state manager — persists screen state between requests
 from jarvis_os.core.state_manager import GlobalStateManager
@@ -254,13 +287,19 @@ _AUTH_PUBLIC_PREFIXES = ("/app",)
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if not _JARVIS_TOKEN:
-            return await call_next(request)
         path = request.url.path
         if path in _AUTH_PUBLIC_PATHS:
             return await call_next(request)
         if any(path.startswith(p) for p in _AUTH_PUBLIC_PREFIXES):
             return await call_next(request)
+
+        if not _JARVIS_TOKEN:
+            # Enforce localhost only when no token is configured
+            client_host = request.client.host if request.client else ""
+            if client_host not in ("127.0.0.1", "::1", "localhost"):
+                return Response("Unauthorized: Server requires an API token for external access", status_code=401)
+            return await call_next(request)
+
         auth = request.headers.get("Authorization", "")
         if auth == f"Bearer {_JARVIS_TOKEN}":
             return await call_next(request)
@@ -322,7 +361,6 @@ async def get_dashboard():
     from jarvis_os.dashboard.dashboard_manager import DashboardManager
     from jarvis_os.core.quick_links import QUICK_LINKS, get_top_sites
     from jarvis_os.core.usage import track_event
-    from jarvis_os.core.wake_word import get_wake_word_daemon
     
     track_event("dashboard_open")
     manager = DashboardManager()
@@ -579,19 +617,27 @@ async def wake_word_status():
     }
 
 
-@app.post("/chat", response_model=ChatResponse)
+from fastapi import Header
+from config import JARVIS_API_KEY
 
-async def chat(request: ChatRequest):
+# FIX 3: 10/minute per IP limit
+@app.post("/chat", response_model=ChatResponse)
+@limiter.limit("10/minute")
+async def chat(chat_req: ChatRequest, request: Request, x_api_key: Optional[str] = Header(None)):
+
+    # FIX 3: API key auth check
+    if JARVIS_API_KEY and x_api_key != JARVIS_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing X-API-Key header")
 
     if not chat_service:
         raise HTTPException(status_code=503, detail="Chat service not initialized")
 
     logger.info("[API /chat] Incoming | session_id=%s | message_len=%d | message=%.100s",
-                request.session_id or "new", len(request.message), request.message)
+                chat_req.session_id or "new", len(chat_req.message), chat_req.message)
 
     try:
-        session_id = chat_service.get_or_create_session(request.session_id)
-        response_text = request_router.process_request(session_id, request.message)
+        session_id = chat_service.get_or_create_session(chat_req.session_id)
+        response_text = request_router.process_request(session_id, chat_req.message)
         chat_service.save_chat_session(session_id)
         logger.info("[API /chat] Done | session_id=%s | response_len=%d", session_id[:12], len(response_text))
         return ChatResponse(response=response_text, session_id=session_id)
@@ -616,21 +662,21 @@ async def chat(request: ChatRequest):
 from app.utils.stream_utils import _stream_generator, _tts_pool
 
 @app.post("/chat/stream")
-
-async def chat_stream(request: ChatRequest):
+@limiter.limit("60/minute")
+async def chat_stream(chat_req: ChatRequest, request: Request):
     
     if not chat_service:
         raise HTTPException(status_code=503, detail="Chat service not initialized")
     
     logger.info("[API /chat/stream] Incoming | session_id=%s | message_len=%d | message=%.100s",
-                request.session_id or "new", len(request.message), request.message)
+                chat_req.session_id or "new", len(chat_req.message), chat_req.message)
     
     try:
-        session_id = chat_service.get_or_create_session(request.session_id)
+        session_id = chat_service.get_or_create_session(chat_req.session_id)
         
-        chunk_iter = request_router.process_request_stream(session_id, request.message)
+        chunk_iter = request_router.process_request_stream(session_id, chat_req.message)
         return StreamingResponse(
-            _stream_generator(session_id, chunk_iter, is_realtime=False, tts_enabled=request.tts),
+            _stream_generator(session_id, chunk_iter, is_realtime=False, tts_enabled=chat_req.tts),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -650,18 +696,18 @@ async def chat_stream(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat/realtime", response_model=ChatResponse)
-
-async def chat_realtime(request: ChatRequest):
+@limiter.limit("60/minute")
+async def chat_realtime(chat_req: ChatRequest, request: Request):
     
     if not chat_service:
         raise HTTPException(status_code=503, detail="Chat service not initialized")
     
     logger.info("[API /chat/realtime] Incoming | session_id=%s | message_len=%d | message=%.100s",
-                request.session_id or "new", len(request.message), request.message)
+                chat_req.session_id or "new", len(chat_req.message), chat_req.message)
     
     try:
-        session_id = chat_service.get_or_create_session(request.session_id)
-        response_text = chat_service.process_realtime_message(session_id, request.message)
+        session_id = chat_service.get_or_create_session(chat_req.session_id)
+        response_text = chat_service.process_realtime_message(session_id, chat_req.message)
         chat_service.save_chat_session(session_id)
         logger.info("[API /chat/realtime] Done | session_id=%s | response_len=%d", session_id[:12], len(response_text))
         return ChatResponse(response=response_text, session_id=session_id)
@@ -684,20 +730,20 @@ async def chat_realtime(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
 @app.post("/chat/realtime/stream")
-
-async def chat_realtime_stream(request: ChatRequest):
+@limiter.limit("60/minute")
+async def chat_realtime_stream(chat_req: ChatRequest, request: Request):
     
     if not chat_service:
         raise HTTPException(status_code=503, detail="Service not initialized")
     
     logger.info("[API /chat/realtime/stream] Incoming | session_id=%s | message_len=%d | message=%.100s",
-                request.session_id or "new", len(request.message), request.message)
+                chat_req.session_id or "new", len(chat_req.message), chat_req.message)
     
     try:
-        session_id = chat_service.get_or_create_session(request.session_id)
-        chunk_iter = chat_service.process_realtime_message_stream(session_id, request.message)
+        session_id = chat_service.get_or_create_session(chat_req.session_id)
+        chunk_iter = chat_service.process_realtime_message_stream(session_id, chat_req.message)
         return StreamingResponse(
-            _stream_generator(session_id, chunk_iter, is_realtime=True, tts_enabled=request.tts),
+            _stream_generator(session_id, chunk_iter, is_realtime=True, tts_enabled=chat_req.tts),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -717,23 +763,23 @@ async def chat_realtime_stream(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat/jarvis/stream")
-
-async def chat_jarvis_stream(request: ChatRequest):
+@limiter.limit("60/minute")
+async def chat_jarvis_stream(chat_req: ChatRequest, request: Request):
     
     if not chat_service:
         raise HTTPException(status_code=503, detail="Service not initialized")
     
     logger.info("[API /chat/jarvis/stream] Incoming | session_id=%s | message_len=%d | img=%s | message=%.100s",
-                request.session_id or "new", len(request.message), "yes" if request.imgbase64 else "no", request.message)
+                chat_req.session_id or "new", len(chat_req.message), "yes" if chat_req.imgbase64 else "no", chat_req.message)
     
     try:
-        session_id = chat_service.get_or_create_session(request.session_id)
+        session_id = chat_service.get_or_create_session(chat_req.session_id)
         chunk_iter = chat_service.process_jarvis_message_stream(
-            session_id, request.message, imgbase64=request.imgbase64
+            session_id, chat_req.message, imgbase64=chat_req.imgbase64
         )
         
         return StreamingResponse(
-            _stream_generator(session_id, chunk_iter, is_realtime=True, tts_enabled=request.tts),
+            _stream_generator(session_id, chunk_iter, is_realtime=True, tts_enabled=chat_req.tts),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -761,6 +807,10 @@ async def get_task_status(task_id: str):
     
     if not task_id or len(task_id) > 32:
         raise HTTPException(status_code=400, detail="Invalid task_id")
+        
+@app.get("/briefing")
+async def get_briefing():
+    return {"briefing": scheduler_module.LAST_BRIEFING}
     
     data = task_manager.get_serializable(task_id)
     
@@ -884,9 +934,13 @@ async def speech_to_text(
 
 
 _frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+_react_ui_dir = Path(__file__).resolve().parent.parent / "ui" / "dist"
 
 if _frontend_dir.exists():
     app.mount("/app", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend")
+
+if _react_ui_dir.exists():
+    app.mount("/ui", StaticFiles(directory=str(_react_ui_dir), html=True), name="react_ui")
 
 @app.get("/")
 async def root_redirect():
