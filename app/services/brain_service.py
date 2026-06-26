@@ -29,7 +29,7 @@ _PRIMARY_BRAIN_PROMPT = """You are the decision-maker for JARVIS. Classify the u
 === CATEGORIES ===
 
 **camera** — User wants to ANALYZE, IDENTIFY, or SEE something visual. They are holding, showing, or displaying something and want you to look at it.
-Examples: "What is this?" / "What am I holding?" / "What do you see?" / "Describe what I'm showing" / "Identify this" / "What's in my hand?" / "Look at this" / "Read this" / "Can you see this?" / "Check this out"
+Examples: "What is this?" / "What am I holding?" / "What do you see?" / "Describe what I'm showing" / "Identify this" / "What's in my hand?" / "Look at this" / "Read this" / "Can you see this?" / "Check this out" / "Analyze my screen" / "What's on my screen"
 - Any request where the user expects you to LOOK at something through the camera → camera
 
 **task** — User wants ONLY an ACTION performed (no question to answer). Opening apps/websites, playing music/video, generating images, writing content, searching Google/YouTube, checking calendar, reading emails, or controlling the webcam.
@@ -622,7 +622,9 @@ Classify. Output EXACTLY ONE category name."""
         if any(x in m for x in ["what do you see", "what can you see", "what am i holding",
                                   "what is this", "describe this", "identify this",
                                   "what's in my hand", "look at this", "read this",
-                                  "can you see", "check this out", "show you"]):
+                                  "can you see", "check this out", "show you",
+                                  "analyze my screen", "what's on my screen", 
+                                  "whats on my screen", "look at my screen", "read my screen"]):
             return "camera"
 
         if any(x in m for x in ["open webcam", "turn on camera", "start camera",
