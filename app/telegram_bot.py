@@ -61,6 +61,7 @@ async def mail_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error fetching mail: {e}")
 
 import asyncio
+import webbrowser
 
 def consume_jarvis_stream(chat_service, session_id, text):
     stream = chat_service.process_jarvis_message_stream(session_id, text)
@@ -71,9 +72,16 @@ def consume_jarvis_stream(chat_service, session_id, text):
             full_response += chunk
         elif isinstance(chunk, dict) and "actions" in chunk:
             actions = chunk["actions"]
-            for key in ["wopens", "plays", "googlesearches", "youtubesearches", "images"]:
+            for key in ["wopens", "plays", "googlesearches", "youtubesearches"]:
                 if actions.get(key):
-                    links.extend(actions[key])
+                    for url in actions[key]:
+                        links.append(url)
+                        try:
+                            webbrowser.open(url)
+                        except Exception as e:
+                            logger.error(f"[TELEGRAM] Failed to open URL on host PC: {e}")
+            if actions.get("images"):
+                links.extend(actions["images"])
                     
     if links:
         full_response += "\n\nHere are your links:\n" + "\n".join(links)
