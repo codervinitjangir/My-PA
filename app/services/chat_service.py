@@ -41,8 +41,46 @@ class ChatService:
         self.vision_service = vision_service
         self.task_manager = task_manager
         self.orchestrator = orchestrator
+        self._state_mgr = None
         self.sessions: Dict[str, List[ChatMessage]] = {}
         self._save_lock = threading.Lock()
+
+    def set_state_manager(self, state_mgr) -> None:
+        """Inject the GlobalStateManager so chat can read live screen state."""
+        self._state_mgr = state_mgr
+
+    def _build_screen_context(self) -> str:
+        """
+        Reads last screen analysis from GlobalStateManager.
+        Returns a formatted context block if fresh (< 5 min old), else empty string.
+        Silently returns "" on any error — never breaks chat.
+        """
+        try:
+            if not self._state_mgr:
+                return ""
+            global_state = self._state_mgr.build_global_state()
+            screen = global_state.get("screen")
+            if not screen:
+                return ""
+            import time
+            age_seconds = time.time() - screen.get("timestamp", 0)
+            if age_seconds > 300:   # older than 5 minutes — skip
+                return ""
+            app  = screen.get("application", "Unknown")
+            act  = screen.get("activity", "Unknown")
+            conf = screen.get("confidence", 0)
+            summ = screen.get("summary", "")
+            nxt  = screen.get("next_best_action", "")
+            age_str = f"{int(age_seconds)}s ago"
+            return (
+                f"\n[SCREEN CONTEXT — analyzed {age_str}]\n"
+                f"Application: {app} | Activity: {act} | Confidence: {conf:.0f}%\n"
+                f"Summary: {summ}\n"
+                f"Suggested next action: {nxt}\n"
+                f"[END SCREEN CONTEXT]\n"
+            )
+        except Exception:
+            return ""
 
     def update_vector_store_live(self, session_id: str):
         vss = getattr(self.groq_service, 'vector_store_service', None)
@@ -114,6 +152,8 @@ class ChatService:
     def validate_session_id(self, session_id: str) -> bool:
         if not session_id or not isinstance(session_id, str):
             return False
+        if session_id == "telegram":
+            return True
         # Enforce strict UUID4 format
         return bool(re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', session_id, re.IGNORECASE))
 
@@ -512,6 +552,12 @@ class ChatService:
         self.add_message(session_id, "assistant", "")
         
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
+        
+        screen_ctx = self._build_screen_context()
+        if screen_ctx:
+            # Prepend as a system message so LLM sees it but user doesn't
+            chat_history = [("system", screen_ctx)] + list(chat_history)
+            logger.info("[SCREEN CTX] Injected screen context into chat (age < 5min)")
 
         yield {
             "_activity": {
