@@ -99,7 +99,10 @@ else:
     JARVIS_SYSTEM_PROMPT = _JARVIS_SYSTEM_PROMPT_BASE
 
 GENERAL_CHAT_ADDENDUM = """
-You are in GENERAL mode (no web search). Answer from your knowledge and the context provided (learning data, conversation history). Answer confidently and briefly. Never tell the user to search online or check a website — you are their source. Default to 1-2 sentences; only elaborate when the user asks for more or the question clearly needs it. If you have relevant context from the user's learning data, use it naturally without mentioning the source.
+You are in GENERAL mode (no web search). Answer from your knowledge and the context provided (learning data, conversation history). Answer confidently and briefly. Never tell the user to search online or check a website — you are their source. Default to 1-2 sentences; only elaborate when the user asks for more or the question clearly needs it. 
+
+If you have relevant context from the user's learning data, use it naturally without mentioning the source. 
+CRITICAL RULE: Always prioritize the Conversation History. If the user asks a follow-up question about the conversation history (e.g., about their emails, calendar, or a previous topic), answer based purely on the history and completely IGNORE the learning data context if it is unrelated to the conversation topic.
 """
 
 REALTIME_CHAT_ADDENDUM = """

@@ -43,6 +43,18 @@ async def generate_briefing(groq_service):
         briefing = groq_service.get_response(prompt)
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         LAST_BRIEFING = f"[{timestamp}]\n{briefing}"
+        
+        try:
+            import os
+            from telegram import Bot
+            token = os.getenv("TELEGRAM_BOT_TOKEN")
+            owner_id = os.getenv("TELEGRAM_OWNER_ID")
+            if token and owner_id:
+                bot = Bot(token=token)
+                await bot.send_message(chat_id=int(owner_id), text=f"🌅 Good morning, Sir.\n\n{LAST_BRIEFING}")
+        except Exception as e:
+            logger.warning(f"[TELEGRAM] Failed to push briefing: {e}")
+            
         logger.info("[SCHEDULER] Morning briefing generated successfully.")
     except Exception as e:
         logger.error(f"[SCHEDULER] Failed to generate briefing: {e}")

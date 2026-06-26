@@ -312,8 +312,13 @@ class GroqProvider(BaseProvider):
 
         context = ""
         try:
+            # Contextualize short follow-ups before searching the vector store
+            search_query = question
+            if chat_history and len(question.split()) <= 4:
+                search_query = self._extract_search_query(question, chat_history)
+
             retriever = self.vector_store_service.get_retriever(k=5)
-            context_docs = retriever.invoke(question)
+            context_docs = retriever.invoke(search_query)
             if context_docs:
                 context = "\n".join([doc.page_content for doc in context_docs])
         except Exception:

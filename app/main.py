@@ -104,6 +104,7 @@ async def lifespan(app: FastAPI):
 
     global vector_store_service, groq_service, realtime_service, brain_service
     global task_executor, task_manager, vision_service, chat_service, stt_service
+    _telegram_app = None
     print_title()
     logger.info("-" * 60)
     logger.info("J.A.R.V.I.S - Starting Up...")
@@ -201,6 +202,9 @@ async def lifespan(app: FastAPI):
         logger.info("Frontend: http://localhost:8000/app/ (open in browser)")
         logger.info("-" * 60)
 
+        from app.telegram_bot import start_telegram_bot
+        _telegram_app = await start_telegram_bot(chat_service)
+
         yield
 
     except Exception as e:
@@ -243,6 +247,13 @@ async def lifespan(app: FastAPI):
             shutdown_scheduler()
         except Exception as e:
             logger.error(f"Error shutting down scheduler: {e}")
+
+        try:
+            if _telegram_app:
+                from app.telegram_bot import stop_telegram_bot
+                await stop_telegram_bot(_telegram_app)
+        except Exception as e:
+            logger.error(f"Error shutting down telegram bot: {e}")
 
         logger.info("All sessions saved. Goodbye!")
 
