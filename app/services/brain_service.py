@@ -637,6 +637,8 @@ Classify. Output EXACTLY ONE category name."""
             "write ", "draft ", "compose ", "essay", "poem", "letter",
             "search for ", "look up ", "find me ", "google ",
             "search youtube", "find videos",
+            "check mail", "check email", "check my email", "read my mail", "read email",
+            "check calendar", "my schedule", "any meeting", "any event",
         ]
 
         if any(m.startswith(p) or p in m for p in task_patterns):
@@ -680,6 +682,12 @@ Classify. Output EXACTLY ONE category name."""
 
         if any(x in m for x in ["search for ", "look up ", "find me ", "google "]) and "youtube" not in m:
             tasks.append("google_search")
+
+        if any(x in m for x in ["check mail", "check email", "read mail", "read email"]):
+            tasks.append("check_emails")
+
+        if any(x in m for x in ["check calendar", "my schedule", "meeting", "event"]):
+            tasks.append("check_calendar")
 
         return tasks if tasks else ["open"]
 
