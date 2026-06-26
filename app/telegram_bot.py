@@ -63,8 +63,8 @@ async def mail_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 import asyncio
 import webbrowser
 
-def consume_jarvis_stream(chat_service, session_id, text):
-    stream = chat_service.process_jarvis_message_stream(session_id, text)
+def consume_jarvis_stream(chat_service, session_id, text, imgbase64=None):
+    stream = chat_service.process_jarvis_message_stream(session_id, text, imgbase64)
     full_response = ""
     links = []
     for chunk in stream:
@@ -86,6 +86,7 @@ def consume_jarvis_stream(chat_service, session_id, text):
     if links:
         full_response += "\n\nHere are your links:\n" + "\n".join(links)
         
+    logger.info(f"[TELEGRAM] Sending response: {full_response}")
     return full_response
 
 @owner_only
@@ -138,6 +139,34 @@ async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"Screen analysis failed: {e}")
 
+@owner_only
+async def photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_service = context.application.bot_data.get("chat_service")
+    if not chat_service:
+        await update.message.reply_text("Error: ChatService not available.")
+        return
+        
+    try:
+        photo = update.message.photo[-1]
+        file = await context.bot.get_file(photo.file_id)
+        byte_array = await file.download_as_bytearray()
+        
+        import base64
+        img_b64 = base64.b64encode(byte_array).decode('utf-8')
+        img_b64 = f"data:image/jpeg;base64,{img_b64}"
+        
+        user_text = update.message.caption or "What is in this image?"
+        
+        session_id = chat_service.get_or_create_session("telegram")
+        response = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text, img_b64)
+        if response:
+            await update.message.reply_text(response[:4090])
+        else:
+            await update.message.reply_text("No response generated.")
+    except Exception as e:
+        logger.error(f"[TELEGRAM] Error processing photo: {e}", exc_info=True)
+        await update.message.reply_text("Sorry, I encountered an error processing your photo.")
+
 async def start_telegram_bot(chat_service):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -153,6 +182,7 @@ async def start_telegram_bot(chat_service):
     application.add_handler(CommandHandler("mail", mail_command))
     application.add_handler(CommandHandler("screen", screen_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
+    application.add_handler(MessageHandler(filters.PHOTO, photo_message))
     
     await application.initialize()
     await application.start()
