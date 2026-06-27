@@ -32,7 +32,7 @@ def owner_only(func):
 
 @owner_only
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Good day, Sir. J.A.R.V.I.S online. Send me anything or use /brief, /cal, /mail.")
+    await update.message.reply_text("Good day, Sir. J.A.R.V.I.S online. Send me anything or use /brief, /cal, /mail.\n/sendfile pdf — get latest PDF from Gmail or Downloads")
 
 @owner_only
 async def brief_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -62,16 +62,149 @@ async def mail_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 import asyncio
 import webbrowser
+import tempfile
+from pathlib import Path
+from app.plugins.file_finder_tool import FileFinderTool
+
+async def send_file_to_telegram(bot, chat_id, file_bytes, filename, caption):
+    """
+    Sends a file to Telegram using bot.send_document().
+    file_bytes: raw bytes
+    filename: display name shown in Telegram
+    caption: short message shown above the file
+    Uses tempfile.NamedTemporaryFile — deleted automatically after send.
+    Max file size check: if len(file_bytes) > 50 * 1024 * 1024, reply with size error.
+    """
+    if len(file_bytes) > 50 * 1024 * 1024:
+        await bot.send_message(chat_id=chat_id, text=f"File {filename} is too large (>50MB) for Telegram.")
+        return
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{filename}") as temp_file:
+        temp_file.write(file_bytes)
+        temp_file_path = temp_file.name
+
+    try:
+        with open(temp_file_path, 'rb') as f:
+            await bot.send_document(chat_id=chat_id, document=f, filename=filename, caption=caption)
+    except Exception as e:
+        logger.error(f"[TELEGRAM] Failed to send file: {e}")
+        await bot.send_message(chat_id=chat_id, text=f"Error sending file: {e}")
+    finally:
+        try:
+            os.remove(temp_file_path)
+        except Exception as e:
+            logger.error(f"[TELEGRAM] Failed to delete temp file {temp_file_path}: {e}")
+
+@owner_only
+async def sendfile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Usage: /sendfile pdf          → finds latest PDF attachment in Gmail, sends it
+           /sendfile report.pdf   → finds report.pdf in local filesystem, sends it
+           /sendfile              → replies with usage instructions
+    """
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "Usage:\n/sendfile pdf — latest PDF from Gmail\n/sendfile filename.pdf — local file search"
+        )
+        return
+
+async def do_sendfile_logic(query: str, bot, chat_id, reply_func):
+    await reply_func(f"Looking for '{query}', Sir...")
+
+    common_types = ["pdf", "docx", "xlsx", "zip", "png", "jpg", "jpeg", "txt", "csv"]
+
+    if query in common_types:
+        # Gmail first
+        tool = GmailSummaryTool()
+        result = await asyncio.to_thread(tool.get_latest_attachment, file_type=query)
+        if result.get("found"):
+            caption = f"📎 From: {result['sender']}\n📧 Subject: {result['subject']}\n📦 Size: {result['size_mb']:.1f} MB"
+            await send_file_to_telegram(bot, chat_id, result['data'], result['filename'], caption)
+            return
+        # fallback to local
+        finder = FileFinderTool()
+        local = await asyncio.to_thread(finder.execute, file_type=query)
+    else:
+        # Local first
+        finder = FileFinderTool()
+        local = await asyncio.to_thread(finder.execute, filename=query)
+        if not local.get("found"):
+            # fallback to Gmail
+            ext = query.split(".")[-1] if "." in query else query
+            tool = GmailSummaryTool()
+            result = await asyncio.to_thread(tool.get_latest_attachment, file_type=ext)
+            if result.get("found"):
+                caption = f"📎 From Gmail: {result['sender']}\n📦 {result['size_mb']:.1f} MB"
+                await send_file_to_telegram(bot, chat_id, result['data'], result['filename'], caption)
+                return
+            await reply_func(f"Could not find '{query}' locally or in Gmail, Sir.")
+            return
+
+    if local.get("found"):
+        file_path = Path(local["path"])
+        file_bytes = await asyncio.to_thread(file_path.read_bytes)
+        caption = f"📁 From local: {local['filename']}\n📦 {local['size_mb']:.1f} MB"
+        await send_file_to_telegram(bot, chat_id, file_bytes, local["filename"], caption)
+    else:
+        await reply_func(f"Nothing found for '{query}', Sir.")
+
+
+@owner_only
+async def sendfile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Usage: /sendfile pdf          → finds latest PDF attachment in Gmail, sends it
+           /sendfile report.pdf   → finds report.pdf in local filesystem, sends it
+           /sendfile              → replies with usage instructions
+    """
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "Usage:\n/sendfile pdf — latest PDF from Gmail\n/sendfile filename.pdf — local file search"
+        )
+        return
+
+    query = args[0].lower()
+    await do_sendfile_logic(query, context.bot, update.effective_chat.id, update.message.reply_text)
+
+def background_sendfile(query: str):
+    """Entry point for triggering a file send from outside the telegram bot context (e.g., from web UI)."""
+    import os
+    from telegram import Bot
+    
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    owner_id_str = os.getenv("TELEGRAM_OWNER_ID")
+    if not bot_token or not owner_id_str:
+        logger.error("[TELEGRAM] Missing bot token or owner ID for background sendfile.")
+        return
+        
+    async def run_it():
+        bot = Bot(token=bot_token)
+        chat_id = int(owner_id_str)
+        
+        async def dummy_reply(text):
+            await bot.send_message(chat_id=chat_id, text=text)
+            
+        try:
+            await do_sendfile_logic(query, bot, chat_id, dummy_reply)
+        except Exception as e:
+            logger.error(f"[TELEGRAM] Background sendfile error: {e}")
+            
+    asyncio.run(run_it())
+
 
 def consume_jarvis_stream(chat_service, session_id, text, imgbase64=None):
     stream = chat_service.process_jarvis_message_stream(session_id, text, imgbase64)
     full_response = ""
     links = []
+    final_actions = {}
     for chunk in stream:
         if isinstance(chunk, str):
             full_response += chunk
         elif isinstance(chunk, dict) and "actions" in chunk:
             actions = chunk["actions"]
+            if "sendfile" in actions:
+                final_actions["sendfile"] = actions["sendfile"]
             for key in ["wopens", "plays", "googlesearches", "youtubesearches"]:
                 if actions.get(key):
                     for url in actions[key]:
@@ -87,7 +220,12 @@ def consume_jarvis_stream(chat_service, session_id, text, imgbase64=None):
         full_response += "\n\nHere are your links:\n" + "\n".join(links)
         
     logger.info(f"[TELEGRAM] Sending response: {full_response}")
-    return full_response
+    return full_response, final_actions
+
+class DummyContext:
+    def __init__(self, bot, args):
+        self.bot = bot
+        self.args = args
 
 @owner_only
 async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -99,8 +237,14 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     try:
         session_id = chat_service.get_or_create_session("telegram")
-        response = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text)
-        await update.message.reply_text(response[:4090] if response else "No response generated.")
+        response, actions = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text)
+        if response:
+            await update.message.reply_text(response[:4090])
+        
+        if "sendfile" in actions:
+            query = actions["sendfile"]
+            dummy_ctx = DummyContext(context.bot, [query])
+            await sendfile_command(update, dummy_ctx)
     except Exception as e:
         await update.message.reply_text(f"Error processing message: {e}")
 
@@ -158,11 +302,16 @@ async def photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_text = update.message.caption or "What is in this image?"
         
         session_id = chat_service.get_or_create_session("telegram")
-        response = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text, img_b64)
+        response, actions = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text, img_b64)
         if response:
             await update.message.reply_text(response[:4090])
         else:
             await update.message.reply_text("No response generated.")
+            
+        if "sendfile" in actions:
+            query = actions["sendfile"]
+            dummy_ctx = DummyContext(context.bot, [query])
+            await sendfile_command(update, dummy_ctx)
     except Exception as e:
         logger.error(f"[TELEGRAM] Error processing photo: {e}", exc_info=True)
         await update.message.reply_text("Sorry, I encountered an error processing your photo.")
@@ -181,6 +330,7 @@ async def start_telegram_bot(chat_service):
     application.add_handler(CommandHandler("cal", cal_command))
     application.add_handler(CommandHandler("mail", mail_command))
     application.add_handler(CommandHandler("screen", screen_command))
+    application.add_handler(CommandHandler("sendfile", sendfile_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     application.add_handler(MessageHandler(filters.PHOTO, photo_message))
     

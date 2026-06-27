@@ -1,5 +1,5 @@
 {
-  "dashboard_open": 350,
+  "dashboard_open": 359,
   "morning_brief": 14,
   "screen_analysis": 6,
   "session_resume": 0,
@@ -43,20 +43,21 @@
       "dashboard_open": 1
     },
     "2026-06-26": {
-      "presence_open": 7,
-      "dashboard_open": 183,
+      "presence_open": 11,
+      "dashboard_open": 192,
       "morning_brief": 5,
-      "presence_hide": 2
+      "presence_hide": 3,
+      "presence_analyze": 1
     }
   },
   "web_open": 0,
   "web_search": 0,
   "web_summarize": 0,
-  "presence_open": 37,
-  "presence_hide": 13,
+  "presence_open": 41,
+  "presence_hide": 14,
   "presence_brief": 12,
   "presence_dashboard": 5,
-  "presence_analyze": 11,
+  "presence_analyze": 12,
   "presence_voice": 7,
   "wake_detected": 7,
   "wake_command_executed": 7,

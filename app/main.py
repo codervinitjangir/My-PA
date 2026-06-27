@@ -160,12 +160,14 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing chat service...")
 
         chat_service = ChatService(
-            groq_service, brain_service,
-            task_executor=task_executor,
+            groq_service=groq_service,
+            brain_service=brain_service,
             vision_service=vision_service,
             task_manager=task_manager,
-            orchestrator=orchestrator,
+            orchestrator=orchestrator
         )
+        chat_service.set_state_manager(_state_mgr)
+        logger.info("[STARTUP] Screen context wired into ChatService.")
 
         from jarvis_os.core.operator_runtime import OperatorRuntime
         from jarvis_os.core.request_router import RequestRouter

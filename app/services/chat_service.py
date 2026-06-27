@@ -568,6 +568,37 @@ class ChatService:
 
         brain_idx, chat_idx = get_next_key_pair(len(GROQ_API_KEYS), need_brain=True)
 
+        # File Delivery Pre-Check
+        import re
+        FILE_DELIVERY_PATTERNS = [
+            r"send (?:me |the )?(.*\.(?:pdf|docx|xlsx|zip|png|jpg))",
+            r"(?:download|forward|share|get) (?:the )?(pdf|file|attachment|document)",
+            r"(pdf|file|document) (?:from|in) (?:gmail|email|mail|downloads|desktop)",
+            r"(?:send|find).*(pdf|file|document).*telegram"
+        ]
+        
+        file_query = None
+        for pattern in FILE_DELIVERY_PATTERNS:
+            match = re.search(pattern, clean_user_message, re.IGNORECASE)
+            if match:
+                file_query = match.group(1)
+                break
+                
+        if file_query:
+            if file_query.lower() in ["file", "attachment", "document"]:
+                file_query = "pdf" # Default to pdf if they just ask for "the file"
+            yield "Sending it to your Telegram now, Sir."
+            
+            import threading
+            try:
+                from app.telegram_bot import background_sendfile
+                threading.Thread(target=background_sendfile, args=(file_query,)).start()
+            except Exception as e:
+                logger.error(f"Failed to start background sendfile thread: {e}")
+                
+            yield {"actions": {"sendfile": file_query}}
+            return
+            
         query_type = "realtime"
         reasoning = "Defaulting to realtime"
         brain_elapsed_ms = 0
