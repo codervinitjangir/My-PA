@@ -63,12 +63,18 @@ class STTService:
     def is_available(self) -> bool:
         return len(self._groq_clients) > 0
 
+    DEFAULT_PROMPT = (
+        "JARVIS, Jarvis, brief, calendar, Gmail, email, CloudStream, "
+        "Groq, Telegram, schedule, reminder, meeting, download, PDF, "
+        "send file, screen, analyze, open, play, search"
+    )
+
     def transcribe(
         self,
         audio_bytes: bytes,
         filename: str = "audio.webm",
         language: Optional[str] = None,
-        prompt: Optional[str] = None,
+        prompt: Optional[str] = DEFAULT_PROMPT,
     ) -> dict:
         """
         Transcribe audio bytes to text.

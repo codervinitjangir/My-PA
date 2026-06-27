@@ -41,10 +41,14 @@ if __name__ == "__main__":
         # FIX 4: Remove hardcoded reload=True to avoid production overhead
         ENV = os.getenv("ENV", "development")
         reload = (ENV != "production")
+        
+        # Render provides the port in the $PORT environment variable. Default to 8000 for local.
+        port = int(os.environ.get("PORT", 8000))
+        
         uvicorn.run(
             "app.main:app",
             host="0.0.0.0",
-            port=8000,
+            port=port,
             reload=reload
         )
 

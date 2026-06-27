@@ -839,6 +839,9 @@ class ChatService:
                         yield task_res.text
                         self.save_chat_session(session_id)
                         return
+                    elif query_type == "mixed" and task_res.text:
+                        # For mixed queries, append the task result so the LLM can use it
+                        formatted_results = formatted_results + f"\n\n[Task Result: {task_res.text}]\n" if formatted_results else f"[Task Result: {task_res.text}]\n"
                         
                 # 3. If there were ONLY background tasks, return instantly
                 if not instant_intents and heavy_intents and query_type == "task":

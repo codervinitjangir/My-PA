@@ -50,7 +50,7 @@ import app.scheduler as scheduler_module
 from config import (
     VECTOR_STORE_DIR, GROQ_API_KEYS, GROQ_MODEL, TAVILY_API_KEY,
     EMBEDDING_MODEL, CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHAT_HISTORY_TURNS,
-    ASSISTANT_NAME, TTS_VOICE, TTS_RATE,
+    ASSISTANT_NAME, TTS_VOICE, TTS_RATE, TTS_PITCH,
     VOICE_PROVIDER, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID,
     ELEVENLABS_STABILITY, ELEVENLABS_SIMILARITY, ELEVENLABS_STYLE, ELEVENLABS_SPEAKER_BOOST
 )
@@ -162,6 +162,7 @@ async def lifespan(app: FastAPI):
         chat_service = ChatService(
             groq_service=groq_service,
             brain_service=brain_service,
+            task_executor=task_executor,
             vision_service=vision_service,
             task_manager=task_manager,
             orchestrator=orchestrator
@@ -876,10 +877,27 @@ async def text_to_speech(request: TTSRequest):
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
 
+    def clean_for_tts(text: str) -> str:
+        import re
+        # Remove markdown bold/italic
+        text = re.sub(r'\*\*?(.*?)\*\*?', r'\1', text)
+        # Remove markdown code blocks
+        text = re.sub(r'`{1,3}[^`]*`{1,3}', '', text)
+        # Remove URLs
+        text = re.sub(r'https?://\S+', 'a link', text)
+        # Remove bullet points, replace with pause
+        text = re.sub(r'^\s*[-•]\s+', '', text, flags=re.MULTILINE)
+        # Collapse multiple spaces/newlines
+        text = re.sub(r'\n+', '. ', text)
+        text = re.sub(r'\s{2,}', ' ', text)
+        # Trim
+        return text.strip()
+
     async def generate():
         try:
             voice = "hi-IN-MadhurNeural" if is_hindi_text(text) else TTS_VOICE
-            communicate = edge_tts.Communicate(text=text, voice=voice, rate=TTS_RATE)
+            cleaned_text = clean_for_tts(text)
+            communicate = edge_tts.Communicate(text=cleaned_text, voice=voice, rate=TTS_RATE, pitch=TTS_PITCH)
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
                     yield chunk["data"]
@@ -936,10 +954,25 @@ async def speech_to_text(
         logger.warning("[API /stt] Transcription failed: %s", result["error"])
         raise HTTPException(status_code=422, detail=result["error"])
 
-    logger.info("[API /stt] Done | lang=%s | duration=%.1fs | chars=%d",
-                result.get("language"), result.get("duration", 0), len(result.get("text", "")))
+    # Strip filler words
+    text = result.get("text", "").strip()
+    import re
+    text = re.sub(r'^(?i)(um|uh|hmm|like)\s+', '', text)
+    text = re.sub(r'\s+(?i)(um|uh|hmm|like)$', '', text)
+    text = text.strip()
 
-    return result
+    if not text or len(text) < 2:
+        result = {"text": "", "error": "Could not detect speech. Please speak clearly and try again."}
+    else:
+        result["text"] = text
+
+    lang = result.get("language", "unknown")
+    dur = result.get("duration", 0)
+
+    logger.info('[STT] Transcript: "%s" (lang=%s, duration=%.1fs)', result.get("text", ""), lang, dur)
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(content=result, headers={"X-Language": lang})
 
 
 _frontend_dir = Path(__file__).resolve().parent.parent / "frontend"

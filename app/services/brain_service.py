@@ -32,9 +32,9 @@ _PRIMARY_BRAIN_PROMPT = """You are the decision-maker for JARVIS. Classify the u
 Examples: "What is this?" / "What am I holding?" / "What do you see?" / "Describe what I'm showing" / "Identify this" / "What's in my hand?" / "Look at this" / "Read this" / "Can you see this?" / "Check this out" / "Analyze my screen" / "What's on my screen"
 - Any request where the user expects you to LOOK at something through the camera → camera
 
-**task** — User wants ONLY an ACTION performed (no question to answer). Opening apps/websites, playing music/video, generating images, writing content, searching Google/YouTube, checking calendar, reading emails, or controlling the webcam.
-Examples: "Open YouTube" / "Play despacito" / "Generate image of a cat" / "Write an essay about AI" / "Search for Python tutorials" / "Open webcam" / "Close webcam" / "Launch Netflix" / "Go to Facebook" / "What's on my calendar today?" / "Check my emails" / "Read my unread messages" / "Any event in future?" / "On 16 July?" / "Tomorrow?"
-- ANY request to open, launch, play, generate, draw, create, write, draft, compose, search, check calendar, read emails, or control webcam → task
+**task** — User wants ONLY an ACTION performed (no question to answer). Opening apps/websites, playing music/video, generating images, writing content, searching Google/YouTube, checking calendar, reading emails/mails, or controlling the webcam.
+Examples: "Open YouTube" / "Play despacito" / "Generate image of a cat" / "Write an essay about AI" / "Search for Python tutorials" / "Open webcam" / "Close webcam" / "Launch Netflix" / "Go to Facebook" / "What's on my calendar today?" / "Check my emails" / "Check my mail" / "Any mail?" / "Read my unread messages" / "Any event in future?" / "On 16 July?" / "Tomorrow?"
+- ANY request to open, launch, play, generate, draw, create, write, draft, compose, search, check calendar, read emails/mails, or control webcam → task
 - "Open webcam" / "Turn on camera" / "Close webcam" / "Turn off camera" → task
 - Image/picture/drawing requests → task (NOT camera)
 
@@ -152,8 +152,8 @@ For multiple tasks, separate with commas: task_type1 query1, task_type2 query2
    "On 16 july?" → check_calendar 16 july
    "Next week?" → check_calendar next week
 
--> 'check_emails (query)' — Read, check, search, or manage emails.
-   "Check my emails" → check_emails
+-> 'check_emails (query)' — Read, check, search, or manage emails/mails.
+   "Check my emails" / "Check my mails" / "Any mail?" → check_emails
    "Do I have any new emails?" → check_emails
    "Delete mail from amazon" → check_emails delete mail from amazon
    "Find emails from boss" → check_emails from boss

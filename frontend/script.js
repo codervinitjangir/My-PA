@@ -301,6 +301,21 @@ let vadRAF = null;
 let silenceTimer = null;
 let sttStream = null;
 
+const speechWidgetStyle = document.createElement('style');
+speechWidgetStyle.textContent = `
+    @keyframes speechPulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.02); opacity: 0.9; box-shadow: 0 0 15px rgba(0,255,200,0.4); }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .pulse-anim {
+        animation: speechPulse 0.4s ease-in-out infinite;
+    }
+`;
+document.head.appendChild(speechWidgetStyle);
+
+let maxRecordingTimer = null;
+
 function initSpeech() {
     // Initialization is deferred to startListening to ensure user interaction first.
 }
@@ -351,6 +366,16 @@ async function startListening() {
         mediaRecorder.start(100);
         monitorVAD();
         
+        maxRecordingTimer = setTimeout(() => {
+            if (isListening) {
+                if (speechWidgetText) speechWidgetText.textContent = 'Stopping (30s max)...';
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+                stopListeningInternal();
+            }
+        }, 30000);
+        
     } catch (err) {
         isListening = false;
         if (micBtn) micBtn.classList.remove('listening');
@@ -389,7 +414,9 @@ function monitorVAD() {
             }
             clearTimeout(silenceTimer);
             silenceTimer = null;
+            if (speechWidget) speechWidget.classList.add('pulse-anim');
         } else {
+            if (speechWidget) speechWidget.classList.remove('pulse-anim');
             if (isSpeaking && !silenceTimer) {
                 silenceTimer = setTimeout(() => {
                     // Silence detected -> Stop and send
@@ -397,7 +424,7 @@ function monitorVAD() {
                         mediaRecorder.stop();
                     }
                     stopListeningInternal();
-                }, 1200); // Reduced to 1200ms for faster responsiveness
+                }, 2500); // Increased to 2500ms for better reliability
             }
         }
         vadRAF = requestAnimationFrame(checkSilence);
@@ -409,6 +436,10 @@ function stopListeningInternal() {
     if (vadRAF) cancelAnimationFrame(vadRAF);
     clearTimeout(silenceTimer);
     silenceTimer = null;
+    clearTimeout(maxRecordingTimer);
+    maxRecordingTimer = null;
+    
+    if (speechWidget) speechWidget.classList.remove('pulse-anim');
     
     if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
