@@ -275,6 +275,9 @@ async def lifespan(app: FastAPI):
             logger.error(f"Error flushing usage data: {e}")
 
 
+from fastapi import WebSocket, WebSocketDisconnect
+from app.websocket_manager import laptop_manager
+
 app = FastAPI(
     title="J.A.R.V.I.S API",
     description="Just A Rather Very Intelligent System",
@@ -303,7 +306,7 @@ app.add_middleware(
 
 # ── Security: Bearer token auth (only active when JARVIS_API_TOKEN is set) ────
 _JARVIS_TOKEN = os.getenv("JARVIS_API_TOKEN", "").strip()
-_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config"}
+_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config", "/telegram/webhook"}
 _AUTH_PUBLIC_PREFIXES = ("/app",)
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -315,10 +318,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if not _JARVIS_TOKEN:
-            # Enforce localhost only when no token is configured
-            client_host = request.client.host if request.client else ""
-            if client_host not in ("127.0.0.1", "::1", "localhost"):
-                return Response("Unauthorized: Server requires an API token for external access", status_code=401)
+            # If no token is configured, allow all traffic (public access)
             return await call_next(request)
 
         auth = request.headers.get("Authorization", "")
@@ -356,6 +356,25 @@ async def get_frontend_config(request: Request):
         raise HTTPException(status_code=403, detail="Config only accessible from localhost")
     from config import ASSISTANT_NAME
     return {"token": _JARVIS_TOKEN, "assistant_name": ASSISTANT_NAME}
+
+@app.websocket("/laptop/ws")
+async def laptop_websocket_endpoint(websocket: WebSocket, token: str = None):
+    # Very basic authentication - require JARVIS_API_TOKEN if set
+    if _JARVIS_TOKEN and token != _JARVIS_TOKEN:
+        await websocket.close(code=1008, reason="Unauthorized")
+        return
+        
+    await websocket.accept()
+    laptop_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            await laptop_manager.handle_incoming(data)
+    except WebSocketDisconnect:
+        laptop_manager.disconnect()
+    except Exception as e:
+        logger.error(f"[WEBSOCKET] Error in endpoint: {e}")
+        laptop_manager.disconnect()
 
 @app.get("/api")
 

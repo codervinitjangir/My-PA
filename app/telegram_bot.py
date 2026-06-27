@@ -210,7 +210,12 @@ def consume_jarvis_stream(chat_service, session_id, text, imgbase64=None):
                     for url in actions[key]:
                         links.append(url)
                         try:
-                            webbrowser.open(url)
+                            from config import IS_CLOUD
+                            if IS_CLOUD:
+                                from app.websocket_manager import laptop_manager
+                                laptop_manager.send_and_wait(action="open_url", payload={"url": url})
+                            else:
+                                webbrowser.open(url)
                         except Exception as e:
                             logger.error(f"[TELEGRAM] Failed to open URL on host PC: {e}")
             if actions.get("images"):
@@ -256,10 +261,20 @@ async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from app.services.vision_service import VisionService
         from app.main import _state_mgr, _SCREEN_PROMPT
 
+        from config import IS_CLOUD
         observer = ScreenObserver()
-        image_bytes = observer.capture_screen()
-        img_b64 = observer.sanitize_data(image_bytes)
-        del image_bytes
+        
+        if IS_CLOUD:
+            from app.websocket_manager import laptop_manager
+            resp = await laptop_manager.send_and_wait_async(action="screenshot", timeout=20)
+            if resp.get("status") != "success":
+                await update.message.reply_text(f"Could not reach laptop: {resp.get('message')}")
+                return
+            img_b64 = f"data:image/jpeg;base64,{resp.get('image_b64')}"
+        else:
+            image_bytes = observer.capture_screen()
+            img_b64 = observer.sanitize_data(image_bytes)
+            del image_bytes
 
         vision = VisionService()
         raw_text = vision.analyze_image(prompt=_SCREEN_PROMPT, img_base64=img_b64)
