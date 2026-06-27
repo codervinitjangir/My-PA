@@ -2,8 +2,9 @@ import json
 import logging
 from typing import List, Optional
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
+# Imports moved inside functions for lazy loading
+# from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
 from config import (
@@ -20,6 +21,7 @@ logger = logging.getLogger("J.A.R.V.I.S")
 class VectorStoreService:
 
     def __init__(self):
+        from langchain_huggingface import HuggingFaceEmbeddings
         self.embeddings = HuggingFaceEmbeddings(
             model_name=EMBEDDING_MODEL,
             model_kwargs={"device": "cpu"},
@@ -30,7 +32,7 @@ class VectorStoreService:
             chunk_overlap=CHUNK_OVERLAP,
         )
 
-        self.vector_store: Optional[FAISS] = None
+        self.vector_store: Optional['FAISS'] = None
         self._retriever_cache: dict = {}
 
     def load_learning_data(self) -> List[Document]:
@@ -90,7 +92,8 @@ class VectorStoreService:
 
     # FIX 1: Prevent 20-60s cold start by checking for existing index and loading it.
     # We only rebuild if it's missing or stale.
-    def create_vector_store(self) -> FAISS:
+    def create_vector_store(self) -> 'FAISS':
+        from langchain_community.vectorstores import FAISS
         index_path = VECTOR_STORE_DIR / "index.faiss"
         if index_path.exists():
             try:

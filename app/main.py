@@ -126,9 +126,13 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing vector store service...")
         t0 = time.perf_counter()
         try:
-            vector_store_service = VectorStoreService()
-            vector_store_service.create_vector_store()
-            logger.info("[TIMING] startup_vector_store: %.3fs", time.perf_counter() - t0)
+            if os.getenv("RENDER_EXTERNAL_URL"):
+                logger.info("[CLOUD] Skipping Vector Store to save memory & bypass Render timeout.")
+                vector_store_service = None
+            else:
+                vector_store_service = VectorStoreService()
+                vector_store_service.create_vector_store()
+                logger.info("[TIMING] startup_vector_store: %.3fs", time.perf_counter() - t0)
         except Exception as e:
             logger.warning(f"VectorStore initialization failed: {e}")
             logger.warning("JARVIS will start without long-term memory (vector store unavailable).")
