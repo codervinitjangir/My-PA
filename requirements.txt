@@ -15,15 +15,16 @@ langchain>=0.3.0
 langchain-groq>=0.2.0
 langchain-community>=0.3.0
 langchain-core>=0.3.0
-langchain-huggingface>=0.1.0
+# langchain-huggingface>=0.1.0 # DISABLED for cloud
 langchain-text-splitters>=0.2.0
 groq>=0.9.0
 
 # ── Vector Store / Embeddings ─────────────────────────────────────────────────
-sentence-transformers>=2.2.0
-faiss-cpu>=1.7.0
-torch>=2.0.0
-transformers>=4.30.0
+# DISABLED for Render (Cloud Mode) to save RAM and bypass 512MB limit
+# sentence-transformers>=2.2.0
+# faiss-cpu>=1.7.0
+# torch>=2.0.0
+# transformers>=4.30.0
 
 # ── Web / Networking ──────────────────────────────────────────────────────────
 requests>=2.28.0
