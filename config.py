@@ -3,6 +3,9 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Detect cloud/render environment — skip heavy ML libs
+IS_CLOUD = os.getenv("ENV", "development") == "production" or os.getenv("RENDER", "") != ""
+
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).parent

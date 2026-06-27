@@ -1,0 +1,50 @@
+# =============================================================================
+# J.A.R.V.I.S — Python Dependencies (CLOUD MODE)
+# =============================================================================
+# Heavy ML dependencies (torch, sentence-transformers, faiss-cpu) are excluded
+# to fit within Render's 512MB RAM free tier limit.
+
+# ── Core API ──────────────────────────────────────────────────────────────────
+fastapi>=0.100.0,<1.0
+uvicorn[standard]>=0.22.0
+python-multipart>=0.0.7
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+slowapi>=0.1.9
+
+# ── AI / LLM ─────────────────────────────────────────────────────────────────
+langchain>=0.3.0
+langchain-groq>=0.2.0
+langchain-community>=0.3.0
+langchain-core>=0.3.0
+langchain-text-splitters>=0.2.0
+groq>=0.9.0
+
+# ── Web / Networking ──────────────────────────────────────────────────────────
+requests>=2.28.0
+httpx>=0.24.0
+tavily-python>=0.5.0
+beautifulsoup4>=4.12.0
+browser-use[core]>=0.1.0
+playwright>=1.40.0
+
+# ── Text-to-Speech (Primary: edge-tts, no API key needed) ────────────────────
+edge-tts>=6.1.0
+
+# ── Wake Word ────────────────────────────────────────────────────────────────
+numpy>=1.24.0
+scipy>=1.11.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+Pillow>=10.0.0
+rich>=13.0.0
+
+# ── Google APIs & Scheduling ──────────────────────────────────────────────────
+google-api-python-client>=2.0.0
+google-auth-httplib2>=0.1.0
+google-auth-oauthlib>=1.0.0
+apscheduler>=3.10.0
+pytz>=2024.1
+
+# ── Telegram Bot ──────────────────────────────────────────────────────────────
+python-telegram-bot>=20.7

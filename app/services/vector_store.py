@@ -14,6 +14,7 @@ from config import (
     EMBEDDING_MODEL,
     CHUNK_SIZE,
     CHUNK_OVERLAP,
+    IS_CLOUD,
 )
 
 logger = logging.getLogger("J.A.R.V.I.S")
@@ -21,6 +22,14 @@ logger = logging.getLogger("J.A.R.V.I.S")
 class VectorStoreService:
 
     def __init__(self):
+        self.vector_store = None
+        self.embeddings = None
+        self._retriever_cache: dict = {}
+        
+        if IS_CLOUD:
+            logger.info("[VECTOR STORE] Cloud mode — vector store disabled to save RAM")
+            return
+            
         from langchain_huggingface import HuggingFaceEmbeddings
         self.embeddings = HuggingFaceEmbeddings(
             model_name=EMBEDDING_MODEL,
@@ -33,9 +42,10 @@ class VectorStoreService:
         )
 
         self.vector_store: Optional['FAISS'] = None
-        self._retriever_cache: dict = {}
-
+    
     def load_learning_data(self) -> List[Document]:
+        if IS_CLOUD:
+            return []
         documents = []
 
         for file_path in sorted(LEARNING_DATA_DIR.glob("*.txt")):
@@ -55,6 +65,8 @@ class VectorStoreService:
         return documents
 
     def load_chat_history(self) -> List[Document]:
+        if IS_CLOUD:
+            return []
         documents = []
 
         for file_path in sorted(CHATS_DATA_DIR.glob("*.json")):
@@ -92,7 +104,10 @@ class VectorStoreService:
 
     # FIX 1: Prevent 20-60s cold start by checking for existing index and loading it.
     # We only rebuild if it's missing or stale.
-    def create_vector_store(self) -> 'FAISS':
+    def create_vector_store(self):
+        if IS_CLOUD:
+            return None
+            
         from langchain_community.vectorstores import FAISS
         index_path = VECTOR_STORE_DIR / "index.faiss"
         if index_path.exists():
@@ -130,7 +145,8 @@ class VectorStoreService:
         return self.vector_store
 
     def save_vector_store(self):
-
+        if IS_CLOUD:
+            return
         if self.vector_store:
 
             try:
@@ -141,15 +157,23 @@ class VectorStoreService:
 
     # FIX 1: Add incremental document indexing
     def add_documents_incremental(self, texts: list[str]):
+        if IS_CLOUD:
+            return
         if self.vector_store:
             self.vector_store.add_texts(texts)
             self.save_vector_store()
             logger.info(f"[VECTOR] Added {len(texts)} incremental documents.")
 
     def get_retriever(self, k: int = 10):
-
-        if not self.vector_store:
-            raise RuntimeError("Vector store not initialized. This should not happen.")
+        if IS_CLOUD or not self.vector_store:
+            # Return a dummy retriever to prevent crashes in ChatGroq
+            from langchain_core.retrievers import BaseRetriever
+            from langchain_core.documents import Document
+            
+            class DummyRetriever(BaseRetriever):
+                def _get_relevant_documents(self, query: str, *, run_manager) -> List[Document]:
+                    return []
+            return DummyRetriever()
 
         if k not in self._retriever_cache:
             self._retriever_cache[k] = self.vector_store.as_retriever(search_kwargs={"k": k})
@@ -160,7 +184,7 @@ class VectorStoreService:
         Mem0 Concept: Temporal Reasoning.
         Fetches semantic matches and reranks them, boosting recent memories.
         """
-        if not self.vector_store:
+        if IS_CLOUD or not self.vector_store:
             return []
             
         # Fetch 2x documents for reranking
