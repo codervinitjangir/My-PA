@@ -78,6 +78,17 @@ def init_scheduler(groq_service):
         replace_existing=True
     )
     
+    # Keep-alive ping every 10 minutes (prevents Render free tier sleep)
+    from deploy.keep_alive import keep_alive_ping
+    _scheduler.add_job(
+        keep_alive_ping,
+        "interval",
+        minutes=10,
+        id="keep_alive",
+        replace_existing=True,
+    )
+    logger.info("[SCHEDULER] Keep-alive ping scheduled every 10 minutes")
+    
     _scheduler.start()
     logger.info(f"[SCHEDULER] APScheduler started. Daily briefing set for 08:00 {timezone}.")
 

@@ -101,6 +101,9 @@ def print_title():
 @asynccontextmanager
 
 async def lifespan(app: FastAPI):
+    # Restore Google credentials from base64 env vars (for cloud deployment)
+    from deploy.google_credentials import restore_google_credentials
+    restore_google_credentials()
 
     global vector_store_service, groq_service, realtime_service, brain_service
     global task_executor, task_manager, vision_service, chat_service, stt_service
@@ -583,25 +586,8 @@ async def get_usage():
     return get_today_summary()
 
 @app.get("/health")
-
-async def health():
-    """Simple health check endpoint."""
-    try:
-        return {
-            "status": "healthy",
-            "vector_store": vector_store_service is not None,
-            "groq_service": groq_service is not None,
-            "brain_service": brain_service is not None,
-            "task_executor": task_executor is not None,
-            "task_manager": task_manager is not None,
-            "vision_service": vision_service is not None,
-            "stt_service": stt_service is not None and stt_service.is_available,
-            "chat_service": chat_service is not None
-        }
-
-    except Exception as e:
-        logger.warning("[API /health] Error: %s", e)
-        return {"status": "degraded", "error": str(e)}
+async def health_check():
+    return {"status": "ok", "service": "JARVIS", "version": "1.0"}
 
 @app.get("/api/wake-word/status")
 async def wake_word_status():
