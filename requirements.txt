@@ -18,6 +18,9 @@ langchain-core>=0.3.0
 # langchain-huggingface>=0.1.0 # DISABLED for cloud
 langchain-text-splitters>=0.2.0
 groq>=0.9.0
+google-genai>=1.0.0               # Gemini 2.0 Flash (Tier 1) — current SDK
+openai>=1.30.0                   # AgentRouter via OpenAI-compatible client (Tier 2 & 3)
+
 
 # ── Vector Store / Embeddings ─────────────────────────────────────────────────
 # DISABLED for Render (Cloud Mode) to save RAM and bypass 512MB limit

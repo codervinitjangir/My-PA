@@ -35,6 +35,9 @@ def _is_rate_limit_error(exc: Exception) -> bool:
 
 from app.services.vector_store import VectorStoreService
 from app.providers.groq_provider import GroqProvider as GroqService, AllGroqApisFailedError
+from app.providers.gemini_provider import GeminiProvider, GeminiUnavailableError
+from app.providers.agentrouter_provider import AgentRouterProvider, AgentRouterUnavailableError
+from app.services.llm_router import LLMRouter
 from app.services.chat_service import ChatService
 from app.services.brain_service import BrainService
 from app.services.task_executor import TaskExecutor
@@ -52,7 +55,8 @@ from config import (
     EMBEDDING_MODEL, CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHAT_HISTORY_TURNS,
     ASSISTANT_NAME, TTS_VOICE, TTS_RATE, TTS_PITCH,
     VOICE_PROVIDER, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID,
-    ELEVENLABS_STABILITY, ELEVENLABS_SIMILARITY, ELEVENLABS_STYLE, ELEVENLABS_SPEAKER_BOOST
+    ELEVENLABS_STABILITY, ELEVENLABS_SIMILARITY, ELEVENLABS_STYLE, ELEVENLABS_SPEAKER_BOOST,
+    GEMINI_API_KEY, AGENTROUTER_BASE_URL, AGENTROUTER_API_KEY, DEEP_MODEL, GPT_FAST_MODEL
 )
 
 logging.basicConfig(
@@ -137,9 +141,36 @@ async def lifespan(app: FastAPI):
             logger.warning(f"VectorStore initialization failed: {e}")
             logger.warning("JARVIS will start without long-term memory (vector store unavailable).")
             vector_store_service = None
-        logger.info("Initializing Groq service (general queries)...")
+        logger.info("Initializing Groq service (Tier 4 fallback + STT + search)...")
         groq_service = GroqService(vector_store_service)
         logger.info("Groq service initialized successfully")
+
+        # ── LLM Router: Gemini (T1) + AgentRouter (T2/T3) + Groq (T4) ───────────
+        gemini_provider = None
+        agentrouter_provider = None
+
+        logger.info("[LLM] Initializing Gemini 2.0 Flash (Tier 1)...")
+        try:
+            gemini_provider = GeminiProvider(vector_store_service)
+            logger.info("[LLM] Gemini Flash: READY")
+        except GeminiUnavailableError as e:
+            logger.warning("[LLM] Gemini unavailable — %s. Tier 1 disabled.", e)
+
+        logger.info("[LLM] Initializing AgentRouter (Tier 2: %s / Tier 3: %s)...", GPT_FAST_MODEL, DEEP_MODEL)
+        try:
+            agentrouter_provider = AgentRouterProvider(
+                vector_store_service,
+                fast_model=GPT_FAST_MODEL,
+                deep_model=DEEP_MODEL,
+            )
+            logger.info("[LLM] AgentRouter: READY")
+        except AgentRouterUnavailableError as e:
+            logger.warning("[LLM] AgentRouter unavailable — %s. Tiers 2 & 3 disabled.", e)
+
+        llm_router = LLMRouter(groq_service, gemini_provider, agentrouter_provider)
+        logger.info("[LLM] 4-tier router armed.")
+        # ─────────────────────────────────────────────────────────────────────────
+
         logger.info("Initializing Brain service (Groq query classification)...")
         brain_service = BrainService(groq_service)
         logger.info("Brain service initialized successfully")
@@ -164,10 +195,10 @@ async def lifespan(app: FastAPI):
         orchestrator.register_agent(research_agent)
         logger.info("Orchestrator initialized successfully")
 
-        logger.info("Initializing chat service...")
+        logger.info("Initializing chat service (with 4-tier LLM router)...")
 
         chat_service = ChatService(
-            groq_service=groq_service,
+            groq_service=llm_router,   # LLMRouter duck-types GroqProvider
             brain_service=brain_service,
             task_executor=task_executor,
             vision_service=vision_service,
@@ -190,13 +221,16 @@ async def lifespan(app: FastAPI):
         logger.info("-" * 60)
         logger.info("Service Status:")
         logger.info("  - Vector Store: Ready")
-        logger.info("  - Groq AI (General & Search): Ready")
+        logger.info("  - LLM T1 Gemini Flash:    %s", "READY" if gemini_provider else "DISABLED (no key)")
+        logger.info("  - LLM T2 GPT-5.5:         %s", "READY" if agentrouter_provider else "DISABLED (no key)")
+        logger.info("  - LLM T3 Claude Opus:      %s", "READY" if agentrouter_provider else "DISABLED (no key)")
+        logger.info("  - LLM T4 Groq Llama 70B:  READY (always)")
         logger.info("  - Brain (Unified Decision): Ready")
         logger.info("  - Task Executor: Ready")
         logger.info("  - Background Task Manager: Ready")
         logger.info("  - Vision (Groq): Ready")
         logger.info("  - STT (Groq Whisper): %s", "Ready" if stt_service and stt_service.is_available else "Not available")
-        logger.info("  - Chat Service: Ready")
+        logger.info("  - Chat Service: Ready (4-tier LLM router active)")
         
         # Wake Word Initialization
         try:
