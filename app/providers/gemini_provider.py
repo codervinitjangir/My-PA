@@ -160,7 +160,7 @@ class GeminiProvider(BaseProvider):
             config=_genai_types.GenerateContentConfig(
                 system_instruction=system,
                 temperature=0.5,
-                max_output_tokens=1024,
+                max_output_tokens=4096,
             ),
         )
         logger.info("[Gemini] get_response: %.3fs", time.perf_counter() - t0)
@@ -183,7 +183,7 @@ class GeminiProvider(BaseProvider):
             config=_genai_types.GenerateContentConfig(
                 system_instruction=system,
                 temperature=0.5,
-                max_output_tokens=1024,
+                max_output_tokens=4096,
             ),
         ):
             try:
@@ -215,7 +215,7 @@ class GeminiProvider(BaseProvider):
             config=_genai_types.GenerateContentConfig(
                 system_instruction=system,
                 temperature=0.5,
-                max_output_tokens=1024,
+                max_output_tokens=4096,
             ),
         ):
             try:

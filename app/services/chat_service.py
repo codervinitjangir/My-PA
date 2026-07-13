@@ -34,6 +34,7 @@ class ChatService:
         vision_service: VisionService = None,
         task_manager: TaskManager = None,
         orchestrator: Orchestrator = None,
+        memory_service = None,
     ):
         self.groq_service = groq_service
         self.brain_service = brain_service
@@ -41,9 +42,26 @@ class ChatService:
         self.vision_service = vision_service
         self.task_manager = task_manager
         self.orchestrator = orchestrator
+        self.memory_service = memory_service
         self._state_mgr = None
         self.sessions: Dict[str, List[ChatMessage]] = {}
         self._save_lock = threading.Lock()
+
+    def _detect_remember_forget(self, message: str) -> Optional[tuple]:
+        msg_lower = message.lower().strip()
+        if msg_lower.startswith("remember that "):
+            return ("remember", message[14:].strip())
+        elif msg_lower.startswith("remember: "):
+            return ("remember", message[10:].strip())
+        elif msg_lower.startswith("note that "):
+            return ("remember", message[10:].strip())
+        elif msg_lower in ("forget all", "clear memory"):
+            return ("forget_all", None)
+        elif msg_lower.startswith("forget "):
+            return ("forget", message[7:].strip())
+        elif msg_lower.startswith("delete memory "):
+            return ("forget", message[14:].strip())
+        return None
 
     def set_state_manager(self, state_mgr) -> None:
         """Inject the GlobalStateManager so chat can read live screen state."""
@@ -243,8 +261,11 @@ class ChatService:
         )
         
         self.add_message(session_id, "user", user_message)
-
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
+        mem_prefix = ""
+        if self.memory_service:
+            mem_prefix = self.memory_service.build_memory_context(session_id, user_message)
+        enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
         
         logger.info(
             "[GENERAL] History pairs sent to LLM: %d", 
@@ -254,7 +275,7 @@ class ChatService:
         _, chat_idx = get_next_key_pair(len(GROQ_API_KEYS), need_brain=False)
         
         response = self.groq_service.get_response(
-            question=user_message, 
+            question=enriched_question, 
             chat_history=chat_history, 
             key_start_index=chat_idx
         )
@@ -269,6 +290,12 @@ class ChatService:
         
         self.save_chat_session(session_id)
         self.update_vector_store_live(session_id)
+        if self.memory_service:
+            _snapshot = list(self.sessions[session_id])
+            threading.Thread(
+                target=self.memory_service.maybe_summarise, 
+                args=(session_id, _snapshot, self.groq_service)
+            ).start()
         return response
 
     def process_realtime_message(self, session_id: str, user_message: str) -> str:
@@ -282,6 +309,10 @@ class ChatService:
         self.add_message(session_id, "user", user_message)
 
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
+        mem_prefix = ""
+        if self.memory_service:
+            mem_prefix = self.memory_service.build_memory_context(session_id, user_message)
+        enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
         
         logger.info(
             "[REALTIME] History pairs sent to LLM: %d", 
@@ -291,7 +322,7 @@ class ChatService:
         _, chat_idx = get_next_key_pair(len(GROQ_API_KEYS), need_brain=False)
         
         response = self.groq_service.get_response(
-            question=user_message, 
+            question=enriched_question, 
             chat_history=chat_history, 
             key_start_index=chat_idx,
             use_search=True
@@ -307,6 +338,12 @@ class ChatService:
         
         self.save_chat_session(session_id)
         self.update_vector_store_live(session_id)
+        if self.memory_service:
+            _snapshot = list(self.sessions[session_id])
+            threading.Thread(
+                target=self.memory_service.maybe_summarise, 
+                args=(session_id, _snapshot, self.groq_service)
+            ).start()
         return response
 
     def process_message_stream(
@@ -325,6 +362,10 @@ class ChatService:
         self.add_message(session_id, "assistant", "")
 
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
+        mem_prefix = ""
+        if self.memory_service:
+            mem_prefix = self.memory_service.build_memory_context(session_id, user_message)
+        enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
         
         logger.info(
             "[GENERAL-STREAM] History pairs sent to LLM: %d", 
@@ -358,7 +399,7 @@ class ChatService:
 
         try:
             for chunk in self.groq_service.stream_response(
-                question=user_message, 
+                question=enriched_question, 
                 chat_history=chat_history, 
                 key_start_index=chat_idx
             ):
@@ -393,6 +434,12 @@ class ChatService:
             )
             self.save_chat_session(session_id)
             self.update_vector_store_live(session_id)
+            if self.memory_service:
+                _snapshot = list(self.sessions[session_id])
+                threading.Thread(
+                    target=self.memory_service.maybe_summarise, 
+                    args=(session_id, _snapshot, self.groq_service)
+                ).start()
 
     def process_realtime_message_stream(
         self, 
@@ -410,6 +457,10 @@ class ChatService:
         self.add_message(session_id, "assistant", "")
 
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
+        mem_prefix = ""
+        if self.memory_service:
+            mem_prefix = self.memory_service.build_memory_context(session_id, user_message)
+        enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
         
         logger.info(
             "[REALTIME-STREAM] History pairs sent to LLM: %d", 
@@ -443,7 +494,7 @@ class ChatService:
 
         try:
             for chunk in self.groq_service.stream_response(
-                question=user_message, 
+                question=enriched_question, 
                 chat_history=chat_history, 
                 key_start_index=chat_idx,
                 use_search=True
@@ -479,6 +530,12 @@ class ChatService:
             )
             self.save_chat_session(session_id)
             self.update_vector_store_live(session_id)
+            if self.memory_service:
+                _snapshot = list(self.sessions[session_id])
+                threading.Thread(
+                    target=self.memory_service.maybe_summarise, 
+                    args=(session_id, _snapshot, self.groq_service)
+                ).start()
 
     def process_jarvis_message_stream(
         self, 
@@ -491,6 +548,21 @@ class ChatService:
         CAM_BYPASS_TOKEN = "TTCAMTOKENTT"
         is_vision_requested = CAM_BYPASS_TOKEN in user_message
         clean_user_message = user_message.replace(CAM_BYPASS_TOKEN, "").strip()
+        
+        if self.memory_service:
+            mem_cmd = self._detect_remember_forget(clean_user_message)
+            if mem_cmd:
+                action, payload = mem_cmd
+                if action == "remember":
+                    res = self.memory_service.store_knowledge(payload, self.groq_service)
+                    yield f"Noted, Sir. {res}"
+                elif action == "forget":
+                    res = self.memory_service.forget_knowledge(payload)
+                    yield f"Done, Sir. {res}"
+                elif action == "forget_all":
+                    res = self.memory_service.forget_all()
+                    yield f"Done, Sir. {res}"
+                return
         
         # Intercept /set_model command
         if clean_user_message.startswith("/set_model "):
@@ -554,10 +626,19 @@ class ChatService:
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
         
         screen_ctx = self._build_screen_context()
+        memory_ctx = ""
+        if self.memory_service:
+            memory_ctx = self.memory_service.build_memory_context(session_id, clean_user_message)
+        
+        # Build enriched question with screen/memory context prepended inline
+        ctx_prefix_parts = []
         if screen_ctx:
-            # Prepend as a system message so LLM sees it but user doesn't
-            chat_history = [("system", screen_ctx)] + list(chat_history)
-            logger.info("[SCREEN CTX] Injected screen context into chat (age < 5min)")
+            ctx_prefix_parts.append(screen_ctx)
+        if memory_ctx:
+            ctx_prefix_parts.append(memory_ctx)
+        enriched_jarvis_question = ("\n".join(ctx_prefix_parts) + "\n" + clean_user_message).strip() if ctx_prefix_parts else clean_user_message
+        if ctx_prefix_parts:
+            logger.info("[CONTEXT] Injected screen/memory context into question (%d chars)", len("\n".join(ctx_prefix_parts)))
 
         yield {
             "_activity": {
@@ -864,14 +945,14 @@ class ChatService:
         try:
             if query_type == "general":
                 stream = self.groq_service.stream_response(
-                    question=clean_user_message, 
+                    question=enriched_jarvis_question, 
                     chat_history=chat_history, 
                     key_start_index=chat_idx
                 )
 
             else:
                 stream = self.groq_service.stream_response_with_prefetched(
-                    question=clean_user_message,
+                    question=enriched_jarvis_question,
                     chat_history=chat_history,
                     formatted_results=formatted_results,
                     payload=search_payload,
@@ -917,6 +998,12 @@ class ChatService:
             )
             self.save_chat_session(session_id)
             self.update_vector_store_live(session_id)
+            if self.memory_service:
+                _snapshot = list(self.sessions[session_id])
+                threading.Thread(
+                    target=self.memory_service.maybe_summarise, 
+                    args=(session_id, _snapshot, self.groq_service)
+                ).start()
 
     def save_chat_session(self, session_id: str, log_timing: bool = True):
         if session_id not in self.sessions or not self.sessions[session_id]:

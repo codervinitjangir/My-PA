@@ -71,6 +71,7 @@ class AgentRouterProvider(BaseProvider):
             base_url=AGENTROUTER_BASE_URL,
             api_key=AGENTROUTER_API_KEY,
             timeout=60.0,
+            default_headers={"User-Agent": "RooCode/1.0"}  # Bypass anti-client fingerprinting
         )
         self.fast_model = fast_model
         self.deep_model = deep_model
@@ -143,7 +144,7 @@ class AgentRouterProvider(BaseProvider):
         response = self.client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=1024,
+            max_tokens=4096,
             temperature=0.5,
         )
         elapsed = time.perf_counter() - t0
@@ -166,7 +167,7 @@ class AgentRouterProvider(BaseProvider):
         with self.client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=1024,
+            max_tokens=4096,
             temperature=0.5,
             stream=True,
         ) as response:

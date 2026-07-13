@@ -60,6 +60,31 @@ async def mail_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"Error fetching mail: {e}")
 
+@owner_only
+async def memory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    memory_service = context.application.bot_data.get("memory_service")
+    if not memory_service:
+        await update.message.reply_text("Memory service is offline.")
+        return
+    text = memory_service.get_all_knowledge()
+    await update.message.reply_text(text[:4090])
+
+@owner_only
+async def forget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    memory_service = context.application.bot_data.get("memory_service")
+    if not memory_service:
+        await update.message.reply_text("Memory service is offline.")
+        return
+    keyword = " ".join(context.args).strip().lower()
+    if not keyword:
+        await update.message.reply_text("Usage: /forget [keyword] or /forget all")
+        return
+    if keyword == "all":
+        res = memory_service.forget_all()
+    else:
+        res = memory_service.forget_knowledge(keyword)
+    await update.message.reply_text(res)
+
 import asyncio
 import webbrowser
 import tempfile
@@ -339,6 +364,7 @@ async def start_telegram_bot(chat_service):
         
     application = ApplicationBuilder().token(token).build()
     application.bot_data["chat_service"] = chat_service
+    application.bot_data["memory_service"] = getattr(chat_service, 'memory_service', None)
     
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("brief", brief_command))
@@ -346,6 +372,8 @@ async def start_telegram_bot(chat_service):
     application.add_handler(CommandHandler("mail", mail_command))
     application.add_handler(CommandHandler("screen", screen_command))
     application.add_handler(CommandHandler("sendfile", sendfile_command))
+    application.add_handler(CommandHandler("memory", memory_command))
+    application.add_handler(CommandHandler("forget", forget_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     application.add_handler(MessageHandler(filters.PHOTO, photo_message))
     

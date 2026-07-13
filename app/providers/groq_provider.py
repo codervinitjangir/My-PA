@@ -95,7 +95,7 @@ class GroqProvider(BaseProvider):
                 groq_api_key=key,
                 model_name=GROQ_MODEL,
                 temperature=0.5,
-                max_tokens=1024,
+                max_tokens=4096,
                 request_timeout=GROQ_REQUEST_TIMEOUT,
                 model_kwargs={"frequency_penalty": 0.3},
             )

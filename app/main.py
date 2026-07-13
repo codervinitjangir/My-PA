@@ -41,6 +41,7 @@ from app.services.llm_router import LLMRouter
 from app.services.chat_service import ChatService
 from app.services.brain_service import BrainService
 from app.services.task_executor import TaskExecutor
+from app.services.memory_service import MemoryService
 from app.services.vision_service import VisionService
 from app.services.task_manager import TaskManager
 from app.services.stt_service import STTService
@@ -196,6 +197,13 @@ async def lifespan(app: FastAPI):
         logger.info("Orchestrator initialized successfully")
 
         logger.info("Initializing chat service (with 4-tier LLM router)...")
+        
+        try:
+            memory_service = MemoryService()
+            logger.info("Memory service initialized successfully")
+        except Exception as e:
+            logger.error("Failed to initialize memory service: %s", e)
+            memory_service = None
 
         chat_service = ChatService(
             groq_service=llm_router,   # LLMRouter duck-types GroqProvider
@@ -203,7 +211,8 @@ async def lifespan(app: FastAPI):
             task_executor=task_executor,
             vision_service=vision_service,
             task_manager=task_manager,
-            orchestrator=orchestrator
+            orchestrator=orchestrator,
+            memory_service=memory_service
         )
         chat_service.set_state_manager(_state_mgr)
         logger.info("[STARTUP] Screen context wired into ChatService.")
