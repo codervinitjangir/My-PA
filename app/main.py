@@ -1009,8 +1009,8 @@ async def speech_to_text(
     # Strip filler words
     text = result.get("text", "").strip()
     import re
-    text = re.sub(r'^(?i)(um|uh|hmm|like)\s+', '', text)
-    text = re.sub(r'\s+(?i)(um|uh|hmm|like)$', '', text)
+    text = re.sub(r'^(um|uh|hmm|like)\s+', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s+(um|uh|hmm|like)$', '', text, flags=re.IGNORECASE)
     text = text.strip()
 
     if not text or len(text) < 2:

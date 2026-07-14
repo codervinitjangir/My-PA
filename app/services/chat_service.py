@@ -554,7 +554,8 @@ class ChatService:
             if mem_cmd:
                 action, payload = mem_cmd
                 if action == "remember":
-                    res = self.memory_service.store_knowledge(payload, self.groq_service)
+                    # Use brain_service.groq_service (Llama 3) for lightning-fast memory categorization instead of multi-tier router
+                    res = self.memory_service.store_knowledge(payload, self.brain_service.groq_service)
                     yield f"Noted, Sir. {res}"
                 elif action == "forget":
                     res = self.memory_service.forget_knowledge(payload)
@@ -670,7 +671,6 @@ class ChatService:
                 file_query = "pdf" # Default to pdf if they just ask for "the file"
             yield "Sending it to your Telegram now, Sir."
             
-            import threading
             try:
                 from app.telegram_bot import background_sendfile
                 threading.Thread(target=background_sendfile, args=(file_query,)).start()

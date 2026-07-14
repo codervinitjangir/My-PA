@@ -1,5 +1,5 @@
 {
-  "dashboard_open": 362,
+  "dashboard_open": 408,
   "morning_brief": 14,
   "screen_analysis": 6,
   "session_resume": 0,
@@ -52,12 +52,16 @@
     "2026-06-27": {
       "presence_open": 2,
       "dashboard_open": 3
+    },
+    "2026-07-13": {
+      "presence_open": 1,
+      "dashboard_open": 46
     }
   },
   "web_open": 0,
   "web_search": 0,
   "web_summarize": 0,
-  "presence_open": 43,
+  "presence_open": 44,
   "presence_hide": 14,
   "presence_brief": 12,
   "presence_dashboard": 5,

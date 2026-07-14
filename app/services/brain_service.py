@@ -57,6 +57,7 @@ Examples: "Hello" / "Tell me a joke" / "What is 2+2?" / "What is the capital of 
 - Questions answerable from knowledge or stored user data → general
 - "Do you know my X?" / "What's my X?" → general (answer from stored data, NOT web search)
 - Static, unchanging facts (math, geography, definitions) → general
+- Fictional, hypothetical, or illogical requests (e.g., "open a portal to Asgard", "run diagnostic on mark 42") → general
 
 === CONTEXTUAL INTELLIGENCE ===
 CRITICAL: You MUST read the conversation history to understand context.
@@ -167,6 +168,7 @@ When the user is correcting a previous task, use conversation history to underst
 
 === CRITICAL RULES ===
 *** Extract ONLY the relevant topic/query — REMOVE greetings (hello, hey, hi), assistant name (Jarvis), filler words (can you, please, for me), platform names (on YouTube, on Google), and command words from the query. ***
+*** ONLY extract tasks from the CURRENT user message. Use the recent conversation history ONLY for context (e.g. resolving pronouns). DO NOT extract or repeat tasks from the conversation history. If the current user message does not contain a valid task, return 'open' (fallback). ***
 *** "Open webcam" / "Turn on camera" / "Start camera" → open_webcam (NEVER "open webcam" as a website) ***
 *** "Close webcam" / "Turn off camera" → close_webcam ***
 *** For multiple tasks in one message: "Open Facebook and play Despacito" → open facebook, play Despacito ***

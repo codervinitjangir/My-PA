@@ -112,51 +112,50 @@ class TaskExecutor:
             try:
                 for future in as_completed(futures, timeout=TASK_EXECUTION_TIMEOUT):
                     tag, fn, payload = futures[future]
-                
-                try:
-                    result = future.result()
-                    if tag == "wopen" and result:
-                        if result.startswith("app:"):
-                            app_target = result[4:]
-                            tool = ToolRegistry.get_tool("open_desktop_app")
-                            if tool.execute(app_target=app_target):
-                                response.desktop_apps.append(app_target)
-                        else:
-                            response.wopens.append(result)
-                        
-                    elif tag == "play" and result:
-                        response.plays.append(result)
-                        
-                    elif tag == "image" and result:
-                        response.images.append(result)
-                        
-                    elif tag == "content" and result:
-                        response.contents.append(result)
-                        
-                    elif tag == "google" and result:
-                        response.googlesearches.append(result)
-                        
-                    elif tag == "youtube":
-                        response.youtubesearches.append(result)
-                        
-                    elif tag == "calendar" and result:
-                        response.calendar_results.append(result)
-                        
-                    elif tag == "emails" and result:
-                        response.email_results.append(result)
-                        
-                except Exception as e:
-                    failed_tags.append(tag)
-                    err_msg = str(e)[:100]
-                    logger.warning("[TASK] Task %s failed: %s", tag, e)
-                    
-                    if "content_policy" in err_msg.lower() or "safety" in err_msg.lower():
-                        if tag == "image":
-                            response.text = "I couldn't generate that image - it may violate content guidelines."
+                    try:
+                        result = future.result()
+                        if tag == "wopen" and result:
+                            if result.startswith("app:"):
+                                app_target = result[4:]
+                                tool = ToolRegistry.get_tool("open_desktop_app")
+                                if tool.execute(app_target=app_target):
+                                    response.desktop_apps.append(app_target)
+                            else:
+                                response.wopens.append(result)
                             
-                    elif not response.text:
-                        response.text = f"Something went wrong with that task: {err_msg}"
+                        elif tag == "play" and result:
+                            response.plays.append(result)
+                            
+                        elif tag == "image" and result:
+                            response.images.append(result)
+                            
+                        elif tag == "content" and result:
+                            response.contents.append(result)
+                            
+                        elif tag == "google" and result:
+                            response.googlesearches.append(result)
+                            
+                        elif tag == "youtube":
+                            response.youtubesearches.append(result)
+                            
+                        elif tag == "calendar" and result:
+                            response.calendar_results.append(result)
+                            
+                        elif tag == "emails" and result:
+                            response.email_results.append(result)
+                            
+                    except Exception as e:
+                        failed_tags.append(tag)
+                        err_msg = str(e)[:100]
+                        logger.warning("[TASK] Task %s failed: %s", tag, e)
                         
+                        if "content_policy" in err_msg.lower() or "safety" in err_msg.lower():
+                            if tag == "image":
+                                response.text = "I couldn't generate that image - it may violate content guidelines."
+                                
+                        elif not response.text:
+                            response.text = f"Something went wrong with that task: {err_msg}"
+
             finally:
                 # FIX 2: Cancel pending futures to avoid leaking threads if an error/timeout occurs
                 for future in futures:

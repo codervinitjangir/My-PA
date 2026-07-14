@@ -164,17 +164,22 @@ class AgentRouterProvider(BaseProvider):
         system = self._build_system_prompt(question, chat_history, extra_parts, mode_addendum)
         messages = self._build_messages(question, system, chat_history)
 
+        import httpx
         with self.client.chat.completions.create(
             model=model,
             messages=messages,
             max_tokens=4096,
             temperature=0.5,
             stream=True,
+            timeout=httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=5.0),
         ) as response:
             for chunk in response:
-                delta = chunk.choices[0].delta.content if chunk.choices else None
-                if delta:
-                    yield delta
+                try:
+                    delta = chunk.choices[0].delta.content if chunk.choices else None
+                    if delta:
+                        yield delta
+                except Exception:
+                    continue
 
     # ── BaseProvider interface (uses deep_model as default) ───────────────────
 

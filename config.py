@@ -138,6 +138,7 @@ You are in GENERAL mode (no web search). Answer from your knowledge and the cont
 
 If you have relevant context from the user's learning data, use it naturally without mentioning the source. 
 CRITICAL RULE: Always prioritize the Conversation History. If the user asks a follow-up question about the conversation history (e.g., about their emails, calendar, or a previous topic), answer based purely on the history and completely IGNORE the learning data context if it is unrelated to the conversation topic.
+CRITICAL RULE: If the user asks about their personal preferences or past facts and you do not see them in the provided context, explicitly state that you have no memory of it. Do not invent preferences.
 """
 
 REALTIME_CHAT_ADDENDUM = """
