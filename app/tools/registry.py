@@ -13,6 +13,7 @@ class ToolRegistry:
     Dynamically loads tool plugins from the tools directory.
     """
     _tools: Dict[str, BaseTool] = {}
+    _pending_skills: Dict[str, dict] = {}
 
     @classmethod
     def register(cls, tool: BaseTool):
@@ -103,3 +104,24 @@ class ToolRegistry:
                         logger.warning(f"[TOOL REGISTRY] Failed to load tool from {module_name}: {e}")
         except Exception as e:
             logger.error(f"[TOOL REGISTRY] Failed to load package {package_name}: {e}")
+
+    @classmethod
+    def load_tool_from_file(cls, file_path: str):
+        """Dynamically loads and registers a tool from a specific Python file."""
+        import importlib.util
+        from pathlib import Path
+        
+        path = Path(file_path)
+        module_name = f"app.tools.custom.{path.stem}"
+        spec = importlib.util.spec_from_file_location(module_name, str(path))
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            for name, obj in inspect.getmembers(module):
+                if inspect.isclass(obj) and issubclass(obj, BaseTool) and obj is not BaseTool:
+                    tool_instance = obj()
+                    cls.register(tool_instance)
+                    logger.info(f"[TOOL REGISTRY] Dynamically hot-loaded: {tool_instance.name}")
+                    return tool_instance
+        raise ImportError(f"Could not load tool from {file_path}. Ensure it contains a valid BaseTool subclass.")

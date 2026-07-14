@@ -820,16 +820,15 @@ class ChatService:
 
         def _run_brain():
             if self.orchestrator:
-                res = self.orchestrator.route_request(clean_user_message, chat_history)
-                return (res["category"], res["task_types"], res["method"], res["elapsed_ms"], res.get("intent_dict", {}))
+                return self.orchestrator.route_request(clean_user_message, chat_history, llm_router=self.llm_router)
             if self.brain_service and brain_idx is not None:
                 qt, tasks, r, ms, intent_dict = self.brain_service.classify(
                     clean_user_message, 
                     chat_history, 
                     key_index=brain_idx
                 )
-                return (qt, tasks, r, ms, intent_dict)
-            return ("realtime", [], "No brain service", 0, {})
+                return {"category": qt, "task_types": tasks, "method": r, "elapsed_ms": ms, "intent_dict": intent_dict}
+            return {"category": "realtime", "task_types": [], "method": "No brain service", "elapsed_ms": 0, "intent_dict": {}}
 
         def _run_search():
             return self.groq_service.prefetch_web_search(
@@ -842,20 +841,25 @@ class ChatService:
             future_search = executor.submit(_run_search)
 
             try:
-                query_type, tasks, reasoning, brain_elapsed_ms, intent_dict = future_brain.result(
-                    timeout=JARVIS_BRAIN_SEARCH_TIMEOUT
-                )
+                brain_res = future_brain.result(timeout=JARVIS_BRAIN_SEARCH_TIMEOUT)
+                
+                if brain_res.get("intercepted"):
+                    yield {"text": brain_res["result"]}
+                    return
+                    
+                query_type = brain_res.get("category", "realtime")
+                tasks = brain_res.get("task_types", [])
+                reasoning = brain_res.get("method", "")
+                brain_elapsed_ms = brain_res.get("elapsed_ms", 0)
+                intent_dict = brain_res.get("intent_dict", {})
 
             except FuturesTimeoutError:
                 logger.warning(
                     "[JARVIS] Brain classification timed out after %ds, defaulting to realtime", 
                     JARVIS_BRAIN_SEARCH_TIMEOUT
                 )
-                query_type, tasks, reasoning, brain_elapsed_ms = (
-                    "realtime", 
-                    [], 
-                    "Brain timeout, defaulting to realtime", 
-                    0
+                query_type, tasks, reasoning, brain_elapsed_ms, intent_dict = (
+                    "realtime", [], "Brain timeout, defaulting to realtime", 0, {}
                 )
 
             if query_type == "general":
