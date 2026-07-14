@@ -44,8 +44,8 @@ class GmailSummaryTool(BaseTool):
             
             if not messages:
                 if search_q:
-                    return prefix_msg + f"You have no emails matching '{search_q}', Sir."
-                return prefix_msg + "You have no new unread emails, Sir."
+                    return prefix_msg + f"You have no emails matching '{search_q}', Boss."
+                return prefix_msg + "You have no new unread emails, Boss."
                 
             if search_q:
                 output = [prefix_msg + f"I found {len(messages)} emails matching '{search_q}' (showing up to 5):"]

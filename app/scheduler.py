@@ -27,7 +27,7 @@ async def generate_briefing(groq_service):
         gmail_data = f"Error fetching emails: {e}"
         
     prompt = (
-        "You are JARVIS. Generate a concise morning briefing for Sir. "
+        "You are JARVIS. Generate a concise morning briefing for Boss. "
         "Include: today's schedule, email summary, and one motivational line. "
         "Keep it under 120 words. Speak as JARVIS from Iron Man.\n\n"
         f"Schedule:\n{calendar_data}\n\n"
@@ -51,7 +51,7 @@ async def generate_briefing(groq_service):
             owner_id = os.getenv("TELEGRAM_OWNER_ID")
             if token and owner_id:
                 bot = Bot(token=token)
-                await bot.send_message(chat_id=int(owner_id), text=f"🌅 Good morning, Sir.\n\n{LAST_BRIEFING}")
+                await bot.send_message(chat_id=int(owner_id), text=f"🌅 Good morning, Boss.\n\n{LAST_BRIEFING}")
         except Exception as e:
             logger.warning(f"[TELEGRAM] Failed to push briefing: {e}")
             

@@ -1,7 +1,7 @@
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, RedirectResponse, Response
+from fastapi.responses import StreamingResponse, RedirectResponse, Response, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -605,6 +605,20 @@ async def telegram_webhook(request: Request):
             asyncio.create_task(asyncio.to_thread(handle_telegram_command, chat_id, user_id, text))
             
     return {"status": "ok"}
+
+# ── Memory Backup ────────────────────────────────────────────────────────────
+
+@app.get("/memory/backup")
+async def get_memory_backup():
+    """Returns the base64 encoded SQLite memory database for Render persistence."""
+    if not chat_service or not chat_service.memory_service:
+        raise HTTPException(status_code=503, detail="Memory service not initialized")
+    
+    b64_data = chat_service.memory_service.backup()
+    if not b64_data:
+        raise HTTPException(status_code=500, detail="Failed to backup database or database is empty")
+        
+    return PlainTextResponse(content=b64_data)
 
 # ── Friction Log ──────────────────────────────────────────────────────────────
 

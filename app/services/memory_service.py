@@ -2,6 +2,8 @@ import sqlite3
 import logging
 import threading
 import json
+import os
+import base64
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Tuple, Optional
@@ -12,6 +14,18 @@ class MemoryService:
     def __init__(self, db_path: str = "database/jarvis_memory.db"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        backup_b64 = os.environ.get("MEMORY_BACKUP_B64")
+        if backup_b64:
+            if not self.db_path.exists() or self.db_path.stat().st_size == 0:
+                try:
+                    logger.info("[MEMORY] Restoring database from MEMORY_BACKUP_B64...")
+                    with open(self.db_path, "wb") as f:
+                        f.write(base64.b64decode(backup_b64))
+                    logger.info("[MEMORY] Database restored successfully.")
+                except Exception as e:
+                    logger.error("[MEMORY] Failed to restore database from backup: %s", e)
+                    
         self._init_db()
         self._auto_cleanup()
         
@@ -72,6 +86,16 @@ class MemoryService:
                 logger.info("[MEMORY] Cleanup completed")
         except Exception as e:
             logger.error("[MEMORY] Cleanup failed: %s", e)
+
+    def backup(self) -> str:
+        if not self.db_path.exists():
+            return ""
+        try:
+            with open(self.db_path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
+        except Exception as e:
+            logger.error("[MEMORY] Failed to backup database: %s", e)
+            return ""
 
     def maybe_summarise(self, session_id: str, messages: List[any], llm_router) -> None:
         if not messages or len(messages) < 15 or len(messages) % 15 != 0:

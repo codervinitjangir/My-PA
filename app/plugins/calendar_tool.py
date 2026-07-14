@@ -95,7 +95,7 @@ class GoogleCalendarTool(BaseTool):
             events = events_result.get('items', [])
             
             if not events:
-                return f"No events scheduled for {display_date}, Sir."
+                return f"No events scheduled for {display_date}, Boss."
             
             output = [f"Schedule for {display_date}:"]
             for event in events:

@@ -32,13 +32,13 @@ def owner_only(func):
 
 @owner_only
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Good day, Sir. J.A.R.V.I.S online. Send me anything or use /brief, /cal, /mail.\n/sendfile pdf — get latest PDF from Gmail or Downloads")
+    await update.message.reply_text("Good day, Boss. J.A.R.V.I.S online. Send me anything or use /brief, /cal, /mail.\n/sendfile pdf — get latest PDF from Gmail or Downloads")
 
 @owner_only
 async def brief_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     briefing = app.scheduler.LAST_BRIEFING
     if not briefing or "No briefing yet" in briefing:
-        await update.message.reply_text("No briefing generated yet, Sir. Check back at 08:00.")
+        await update.message.reply_text("No briefing generated yet, Boss. Check back at 08:00.")
     else:
         await update.message.reply_text(briefing)
 
@@ -135,7 +135,7 @@ async def sendfile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 async def do_sendfile_logic(query: str, bot, chat_id, reply_func):
-    await reply_func(f"Looking for '{query}', Sir...")
+    await reply_func(f"Looking for '{query}', Boss...")
 
     common_types = ["pdf", "docx", "xlsx", "zip", "png", "jpg", "jpeg", "txt", "csv"]
 
@@ -163,7 +163,7 @@ async def do_sendfile_logic(query: str, bot, chat_id, reply_func):
                 caption = f"📎 From Gmail: {result['sender']}\n📦 {result['size_mb']:.1f} MB"
                 await send_file_to_telegram(bot, chat_id, result['data'], result['filename'], caption)
                 return
-            await reply_func(f"Could not find '{query}' locally or in Gmail, Sir.")
+            await reply_func(f"Could not find '{query}' locally or in Gmail, Boss.")
             return
 
     if local.get("found"):
@@ -172,7 +172,7 @@ async def do_sendfile_logic(query: str, bot, chat_id, reply_func):
         caption = f"📁 From local: {local['filename']}\n📦 {local['size_mb']:.1f} MB"
         await send_file_to_telegram(bot, chat_id, file_bytes, local["filename"], caption)
     else:
-        await reply_func(f"Nothing found for '{query}', Sir.")
+        await reply_func(f"Nothing found for '{query}', Boss.")
 
 
 @owner_only
@@ -281,7 +281,7 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @owner_only
 async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Capture and analyze current screen, update GlobalStateManager, reply with summary."""
-    await update.message.reply_text("Analyzing your screen, Sir...")
+    await update.message.reply_text("Analyzing your screen, Boss...")
     try:
         from app.services.vision_service import VisionService
         from app.main import _state_mgr, _SCREEN_PROMPT
@@ -309,7 +309,7 @@ async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _state_mgr.update_runtime_state("screen", screen_state.model_dump())
 
         reply = (
-            f"Screen analyzed, Sir.\n\n"
+            f"Screen analyzed, Boss.\n\n"
             f"App: {screen_state.application}\n"
             f"Activity: {screen_state.activity}\n"
             f"Confidence: {screen_state.confidence:.0f}%\n"
@@ -319,7 +319,7 @@ async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply)
 
     except CooldownError as e:
-        await update.message.reply_text(f"Cooldown active, Sir. {e}")
+        await update.message.reply_text(f"Cooldown active, Boss. {e}")
     except Exception as e:
         await update.message.reply_text(f"Screen analysis failed: {e}")
 

@@ -556,13 +556,13 @@ class ChatService:
                 if action == "remember":
                     # Use brain_service.groq_service (Llama 3) for lightning-fast memory categorization instead of multi-tier router
                     res = self.memory_service.store_knowledge(payload, self.brain_service.groq_service)
-                    yield f"Noted, Sir. {res}"
+                    yield f"Noted, Boss. {res}"
                 elif action == "forget":
                     res = self.memory_service.forget_knowledge(payload)
-                    yield f"Done, Sir. {res}"
+                    yield f"Done, Boss. {res}"
                 elif action == "forget_all":
                     res = self.memory_service.forget_all()
-                    yield f"Done, Sir. {res}"
+                    yield f"Done, Boss. {res}"
                 return
         
         # Intercept /set_model command
@@ -669,7 +669,7 @@ class ChatService:
         if file_query:
             if file_query.lower() in ["file", "attachment", "document"]:
                 file_query = "pdf" # Default to pdf if they just ask for "the file"
-            yield "Sending it to your Telegram now, Sir."
+            yield "Sending it to your Telegram now, Boss."
             
             try:
                 from app.telegram_bot import background_sendfile
