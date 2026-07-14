@@ -265,6 +265,9 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     user_text = update.message.text
+    from app.utils.wake_word_utils import strip_wake_word
+    user_text = strip_wake_word(user_text)
+    
     try:
         session_id = chat_service.get_or_create_session("telegram")
         response, actions = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text)
@@ -324,6 +327,30 @@ async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Screen analysis failed: {e}")
 
 @owner_only
+async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_service = context.application.bot_data.get("chat_service")
+    if not chat_service:
+        await update.message.reply_text("Error: ChatService not available.")
+        return
+        
+    args = context.args
+    session_id = "telegram"
+    from config import PRESETS
+    
+    if not args:
+        current = chat_service.session_presets.get(session_id, getattr(chat_service, 'current_preset', 'default'))
+        available = ", ".join(PRESETS.keys())
+        await update.message.reply_text(f"Current mode: {current}\nAvailable modes: {available}")
+        return
+        
+    new_mode = args[0].lower()
+    if new_mode in PRESETS:
+        chat_service.set_preset(new_mode, session_id)
+        await update.message.reply_text(f"Switched to {new_mode} mode, Sir.")
+    else:
+        await update.message.reply_text(f"Unknown mode: {new_mode}. Available modes: {', '.join(PRESETS.keys())}")
+
+@owner_only
 async def photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_service = context.application.bot_data.get("chat_service")
     if not chat_service:
@@ -374,6 +401,7 @@ async def start_telegram_bot(chat_service):
     application.add_handler(CommandHandler("sendfile", sendfile_command))
     application.add_handler(CommandHandler("memory", memory_command))
     application.add_handler(CommandHandler("forget", forget_command))
+    application.add_handler(CommandHandler("mode", mode_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     application.add_handler(MessageHandler(filters.PHOTO, photo_message))
     

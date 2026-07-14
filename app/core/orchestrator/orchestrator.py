@@ -24,7 +24,7 @@ class Orchestrator:
         Main entrypoint. Wraps the original brain classify logic.
         Future implementations will intercept complex intents here and route to agents.
         """
-        category, task_types, method, elapsed_ms = self.brain.classify(message, chat_history)
+        category, task_types, method, elapsed_ms, intent_dict = self.brain.classify(message, chat_history)
         
         # Intercept deep research requests
         if category == "realtime" and any(k in message.lower() for k in ["deep research", "comprehensive research", "deep dive"]):
@@ -38,7 +38,8 @@ class Orchestrator:
                         "category": category,
                         "task_types": task_types,
                         "method": method,
-                        "elapsed_ms": elapsed_ms
+                        "elapsed_ms": elapsed_ms,
+                        "intent_dict": intent_dict
                     }
                 except Exception as e:
                     logger.error(f"[ORCHESTRATOR] DeepResearchAgent failed: {e}")
@@ -48,5 +49,6 @@ class Orchestrator:
             "category": category,
             "task_types": task_types,
             "method": method,
-            "elapsed_ms": elapsed_ms
+            "elapsed_ms": elapsed_ms,
+            "intent_dict": intent_dict
         }

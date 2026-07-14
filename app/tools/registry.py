@@ -62,15 +62,22 @@ class ToolRegistry:
                 logger.warning(f"[TOOL REGISTRY] Embedding search failed: {e}. Falling back to keywords.")
                 
         # Fallback keyword matching
+        import re
         query_lower = query.lower()
+        query_words = set(re.findall(r'\b\w+\b', query_lower))
         scored_tools = []
         for name, tool in cls._tools.items():
             score = 0
             if name.lower() in query_lower:
                 score += 5
-            for word in tool.description.lower().split():
-                if len(word) > 3 and word in query_lower:
+                
+            desc_words = set(re.findall(r'\b\w+\b', tool.description.lower()))
+            common_words = query_words.intersection(desc_words)
+            
+            for word in common_words:
+                if len(word) >= 3:
                     score += 1
+                    
             scored_tools.append((score, name, tool))
             
         scored_tools.sort(key=lambda x: x[0], reverse=True)

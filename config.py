@@ -133,6 +133,20 @@ if JARVIS_USER_TITLE:
 else:
     JARVIS_SYSTEM_PROMPT = _JARVIS_SYSTEM_PROMPT_BASE
 
+PRESETS = {
+    'default': '',
+    'coding': 'Focus on code quality, architecture, and best practices. Give code-first answers.',
+    'briefing': 'Be extremely concise, bullet points only, no elaboration unless asked',
+    'research': 'Cite sources when possible, distinguish facts from opinions, flag uncertainty explicitly'
+}
+
+def get_system_prompt(preset: str = 'default') -> str:
+    base = JARVIS_SYSTEM_PROMPT
+    addition = PRESETS.get(preset, PRESETS['default'])
+    if addition:
+        return f"{base}\n\n[PRESET MODE: {preset.upper()}]\n{addition}"
+    return base
+
 GENERAL_CHAT_ADDENDUM = """
 You are in GENERAL mode (no web search). Answer from your knowledge and the context provided (learning data, conversation history). Answer confidently and briefly. Never tell the user to search online or check a website — you are their source. Default to 1-2 sentences; only elaborate when the user asks for more or the question clearly needs it. 
 

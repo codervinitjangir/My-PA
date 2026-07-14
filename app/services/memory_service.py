@@ -7,6 +7,9 @@ import base64
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Tuple, Optional
+import json
+
+from app.utils.redact import redact_text
 
 logger = logging.getLogger("J.A.R.V.I.S.Memory")
 
@@ -97,15 +100,16 @@ class MemoryService:
             logger.error("[MEMORY] Failed to backup database: %s", e)
             return ""
 
-    def maybe_summarise(self, session_id: str, messages: List[any], llm_router) -> None:
-        if not messages or len(messages) < 15 or len(messages) % 15 != 0:
-            return
+    def maybe_summarise(self, session_id: str, messages: List[any], llm_router) -> Optional[str]:
+        # Compact if messages exceed 15. Keep last 6 out of the summary.
+        if not messages or len(messages) <= 15:
+            return None
             
         logger.info("[MEMORY] Triggering background summary for session %s (msgs: %d)", session_id, len(messages))
         
         try:
-            # Format history for prompt
-            history_text = "\n".join([f"{msg.role}: {msg.content}" for msg in messages[-15:]])
+            # Format history for prompt: all but the last 6 messages
+            history_text = "\n".join([f"{msg.role}: {msg.content}" for msg in messages[:-6]])
             
             prompt = (
                 "You are JARVIS. Summarise the following recent conversation into EXACTLY "
@@ -117,6 +121,8 @@ class MemoryService:
             # Using the router to get response (benefits from fallback chain)
             summary = llm_router.get_response(prompt)
             
+            summary = redact_text(summary)
+            
             with self._get_conn() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
@@ -126,20 +132,38 @@ class MemoryService:
                 conn.commit()
                 logger.info("[MEMORY] Saved session summary")
                 
+            return summary.strip()
+                
         except Exception as e:
             logger.error("[MEMORY] Summarisation failed: %s", e)
+            return None
 
-    def store_knowledge(self, content: str, llm_router) -> str:
+    def store_knowledge(self, content: str, llm_router, force_update_id: int = None, force_category: str = None) -> str:
         try:
+            content = redact_text(content)
+            
+            if force_update_id is not None:
+                with self._get_conn() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE knowledge SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (content, force_update_id)
+                    )
+                    conn.commit()
+                cat = force_category or "fact"
+                return f"Updated existing {cat} memory."
+                
             prompt = (
                 "Categorize the following information into exactly ONE of these categories: "
-                "preference, project, person, decision, fact.\n"
+                "preference, project, person, decision, fact, procedural, resource.\n"
+                "- procedural: how the user likes things done (e.g., 'always confirm before sending emails')\n"
+                "- resource: references to files/documents handled (e.g., 'the Q3 report PDF sent last week')\n"
                 "Return ONLY the category name in lowercase, nothing else.\n"
                 f"Information: {content}"
             )
             category = llm_router.get_response(prompt).strip().lower()
             
-            valid_cats = ["preference", "project", "person", "decision", "fact"]
+            valid_cats = ["preference", "project", "person", "decision", "fact", "procedural", "resource"]
             if category not in valid_cats:
                 category = "fact"
                 
@@ -163,6 +187,25 @@ class MemoryService:
                         best_match_id = row_id
                         
                 if best_match_id:
+                    # CONTRADICTION CHECK
+                    try:
+                        existing_contents = [c for r_id, c in existing_rows]
+                        numbered_list = "\n".join([f"{i+1}. {c}" for i, c in enumerate(existing_contents)])
+                        check_prompt = (
+                            f"Does this new fact contradict any existing fact?\n"
+                            f"New: {content}\n"
+                            f"Existing:\n{numbered_list}\n"
+                            "Reply STRICTLY in JSON format: {\"contradicts\": bool, \"conflicting_id\": int|null, \"explanation\": \"str\"}"
+                        )
+                        resp = llm_router.get_response(check_prompt).strip()
+                        if resp.startswith('```json'): resp = resp[7:-3]
+                        elif resp.startswith('```'): resp = resp[3:-3]
+                        parsed = json.loads(resp)
+                        if parsed.get("contradicts") and parsed.get("explanation"):
+                            return f"__CONTRADICT__:{best_match_id}:{category}:{content}::{parsed.get('explanation')}"
+                    except Exception as e:
+                        logger.error("[MEMORY] Contradiction check failed, failing open: %s", e)
+                        
                     cursor.execute(
                         "UPDATE knowledge SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                         (content, best_match_id)
@@ -230,8 +273,20 @@ class MemoryService:
         except Exception as e:
             return f"Error retrieving memories: {e}"
 
-    def build_memory_context(self, session_id: str, query: str) -> str:
+    def build_memory_context(self, session_id: str, query: str, recent_messages: List[str] = None) -> str:
         try:
+            # Recall Gate
+            if recent_messages:
+                query_words = set(w for w in query.lower().split() if len(w) > 3)
+                if query_words:
+                    for msg in recent_messages:
+                        msg_words = set(w for w in msg.lower().split() if len(w) > 3)
+                        if msg_words:
+                            overlap = len(query_words.intersection(msg_words)) / max(len(query_words), len(msg_words))
+                            if overlap > 0.6:
+                                logger.info("[MEMORY] Recall gate triggered (overlap %.2f) — skipping fetch", overlap)
+                                return ""
+                                
             tech_keywords = ["code", "api", "build", "deploy", "bug", "error", "script", "python", "git", "terminal", "server", "database", "function", "class"]
             is_tech = any(kw in query.lower() for kw in tech_keywords)
             
@@ -294,3 +349,35 @@ class MemoryService:
             logger.error("[MEMORY] Context building failed: %s", e)
             return ""
 
+
+    def extract_passive_knowledge(self, message: str, llm_router) -> None:
+        """Runs in background: extracts facts passively without user asking 'remember'."""
+        if len(message) < 10 or len(message) > 500:
+            return
+            
+        prompt = (
+            "Does the following user message state a clear, permanent personal fact, preference, "
+            "or procedural rule about the user? (Ignore casual chat, opinions on current events, or temporary statuses).\n"
+            "If YES, output ONLY the extracted fact as a clean, standalone sentence (e.g., 'The user is allergic to peanuts.').\n"
+            "If NO, output exactly 'null'.\n\n"
+            f"Message: {message}"
+        )
+        
+        try:
+            resp = llm_router.get_response(prompt).strip()
+            if resp.lower() != 'null' and len(resp) > 5:
+                # It extracted something! Store it.
+                logger.info(f"[MEMORY] Passive Fact Extracted: {resp}")
+                self.store_knowledge(resp, llm_router)
+        except Exception as e:
+            logger.debug(f"[MEMORY] Passive extraction failed silently: {e}")
+
+if __name__ == "__main__":
+    def test_redaction():
+        ms = MemoryService()
+        from app.utils.redact import redact_text
+        res = redact_text('my card is 4111 1111 1111 1111')
+        assert res == 'my card is [REDACTED_CARD]', f"Got {res}"
+        print("Test passed!")
+    
+    test_redaction()

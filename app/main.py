@@ -1020,8 +1020,10 @@ async def speech_to_text(
         logger.warning("[API /stt] Transcription failed: %s", result["error"])
         raise HTTPException(status_code=422, detail=result["error"])
 
-    # Strip filler words
+    # Strip filler words and wake word
+    from app.utils.wake_word_utils import strip_wake_word
     text = result.get("text", "").strip()
+    text = strip_wake_word(text)
     import re
     text = re.sub(r'^(um|uh|hmm|like)\s+', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\s+(um|uh|hmm|like)$', '', text, flags=re.IGNORECASE)

@@ -180,6 +180,7 @@ class LLMRouter:
         chat_history: Optional[List[tuple]] = None,
         key_start_index: int = 0,
         use_search: bool = False,
+        **kwargs
     ) -> Iterator[Any]:
         """
         Streaming call with 4-tier fallback.
@@ -201,30 +202,34 @@ class LLMRouter:
         def _gemini_stream():
             if formatted_results:
                 yield from self.gemini.stream_response_with_prefetched(
-                    question, chat_history, formatted_results, search_payload
+                    question, chat_history, formatted_results, search_payload, **kwargs
                 )
             else:
-                yield from self.gemini.stream_response(question, chat_history, key_start_index, use_search)
+                yield from self.gemini.stream_response(question, chat_history, key_start_index, use_search, **kwargs)
 
         def _gpt_stream():
             mode = self._mode(use_search)
-            extra = [formatted_results] if formatted_results else None
+            extra = [formatted_results] if formatted_results else []
+            tools_str = kwargs.get("tools_str", "")
+            if tools_str: extra.append(tools_str)
             yield from self.agent_router.stream(question, GPT_FAST_MODEL, chat_history,
-                                                extra_parts=extra, mode_addendum=mode)
+                                                extra_parts=extra if extra else None, mode_addendum=mode)
 
         def _claude_stream():
             mode = self._mode(use_search)
-            extra = [formatted_results] if formatted_results else None
+            extra = [formatted_results] if formatted_results else []
+            tools_str = kwargs.get("tools_str", "")
+            if tools_str: extra.append(tools_str)
             yield from self.agent_router.stream(question, DEEP_MODEL, chat_history,
-                                                extra_parts=extra, mode_addendum=mode)
+                                                extra_parts=extra if extra else None, mode_addendum=mode)
 
         def _groq_stream():
             if formatted_results:
                 yield from self.groq_provider.stream_response_with_prefetched(
-                    question, chat_history, formatted_results, search_payload, key_start_index
+                    question, chat_history, formatted_results, search_payload, key_start_index, **kwargs
                 )
             else:
-                yield from self.groq_provider.stream_response(question, chat_history, key_start_index, use_search)
+                yield from self.groq_provider.stream_response(question, chat_history, key_start_index, use_search, **kwargs)
 
         # Route complex queries directly to Tier 3
         if is_complex(question) and self.agent_router:

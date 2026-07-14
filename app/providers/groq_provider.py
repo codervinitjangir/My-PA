@@ -365,9 +365,11 @@ class GroqProvider(BaseProvider):
         except Exception as e:
             raise Exception(f"Error getting response from Groq: {str(e)}") from e
 
-    def stream_response(self, question: str, chat_history: Optional[List[tuple]] = None, key_start_index: int = 0, use_search: bool = False) -> Iterator[Any]:
+    def stream_response(self, question: str, chat_history: Optional[List[tuple]] = None, key_start_index: int = 0, use_search: bool = False, **kwargs) -> Iterator[Any]:
         try:
-            extra_parts = None
+            extra_parts = []
+            if "tools_str" in kwargs and kwargs["tools_str"]:
+                extra_parts.append(kwargs["tools_str"])
             mode_addendum = GENERAL_CHAT_ADDENDUM
             
             if use_search:
@@ -388,15 +390,17 @@ class GroqProvider(BaseProvider):
             else:
                 yield {"activity": {"event": "context_retrieved", "message": "Retrieved relevant context from knowledge base"}}
 
-            prompt, messages = self._build_prompt_and_messages(question, chat_history, extra_system_parts=extra_parts, mode_addendum=mode_addendum)
+            prompt, messages = self._build_prompt_and_messages(question, chat_history, extra_system_parts=extra_parts if extra_parts else None, mode_addendum=mode_addendum)
             yield from self._stream_llm(prompt, messages, question, key_start_index=key_start_index)
         except Exception as e:
             raise Exception(f"Error streaming response from Groq: {str(e)}") from e
 
-    def stream_response_with_prefetched(self, question: str, chat_history: Optional[List[tuple]] = None, formatted_results: Optional[str] = None, payload: Optional[dict] = None, key_start_index: int = 0) -> Iterator[Any]:
+    def stream_response_with_prefetched(self, question: str, chat_history: Optional[List[tuple]] = None, formatted_results: Optional[str] = None, payload: Optional[dict] = None, key_start_index: int = 0, **kwargs) -> Iterator[Any]:
         try:
-            extra_parts = [escape_curly_braces(formatted_results)] if formatted_results else None
-            prompt, messages = self._build_prompt_and_messages(question, chat_history, extra_system_parts=extra_parts, mode_addendum=REALTIME_CHAT_ADDENDUM)
+            extra_parts = [escape_curly_braces(formatted_results)] if formatted_results else []
+            if "tools_str" in kwargs and kwargs["tools_str"]:
+                extra_parts.append(kwargs["tools_str"])
+            prompt, messages = self._build_prompt_and_messages(question, chat_history, extra_system_parts=extra_parts if extra_parts else None, mode_addendum=REALTIME_CHAT_ADDENDUM)
             yield from self._stream_llm(prompt, messages, question, key_start_index=key_start_index)
         except Exception as e:
             raise Exception(f"Error in streaming response with prefetched: {str(e)}") from e

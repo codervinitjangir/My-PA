@@ -172,9 +172,13 @@ class GeminiProvider(BaseProvider):
         chat_history: Optional[List[tuple]] = None,
         key_start_index: int = 0,
         use_search: bool = False,
+        **kwargs
     ) -> Iterator[Any]:
         mode = REALTIME_CHAT_ADDENDUM if use_search else GENERAL_CHAT_ADDENDUM
-        system = self._build_system_prompt(question, chat_history, mode_addendum=mode)
+        extra = []
+        if "tools_str" in kwargs and kwargs["tools_str"]:
+            extra.append(kwargs["tools_str"])
+        system = self._build_system_prompt(question, chat_history, extra_parts=extra if extra else None, mode_addendum=mode)
         contents = self._build_contents(question, chat_history)
 
         for chunk in self._client.models.generate_content_stream(
@@ -200,11 +204,14 @@ class GeminiProvider(BaseProvider):
         formatted_results: Optional[str] = None,
         payload: Optional[dict] = None,
         key_start_index: int = 0,
+        **kwargs
     ) -> Iterator[Any]:
-        extra = [_escape_braces(formatted_results)] if formatted_results else None
+        extra = [_escape_braces(formatted_results)] if formatted_results else []
+        if "tools_str" in kwargs and kwargs["tools_str"]:
+            extra.append(kwargs["tools_str"])
         system = self._build_system_prompt(
             question, chat_history,
-            extra_parts=extra,
+            extra_parts=extra if extra else None,
             mode_addendum=REALTIME_CHAT_ADDENDUM,
         )
         contents = self._build_contents(question, chat_history)

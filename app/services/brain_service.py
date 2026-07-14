@@ -84,8 +84,13 @@ CRITICAL: You MUST read the conversation history to understand context.
 - "How is [something] doing?" / "How is [person]?" → realtime (needs current status)
 
 === RULES ===
-- Output EXACTLY ONE word: general, realtime, camera, task, or mixed
-- Nothing else. No explanation. Just the category name.
+- Output MUST be a valid JSON object.
+- The JSON object MUST contain EXACTLY these keys:
+  1. "intent": string (e.g. CHAT, SEARCH, CODE, GIT, CALCULATE, CALENDAR, EMAIL, FILE_OPS, SYSTEM_OPS, MEDIA_PLAY, MEDIA_GEN, VISION)
+  2. "confidence": float between 0.0 and 1.0
+  3. "reasoning_level": string ("fast" for simple queries, "deep" for complex queries)
+  4. "legacy_route": string (MUST be one of: general, realtime, camera, task, mixed)
+- Nothing else. No explanation. Just the JSON object.
 - Tasks (open, play, generate, write, search, webcam) ALONE → task
 - Question + task in SAME message → mixed
 - Corrections/clarifications → SAME category as the original request they are correcting
@@ -211,21 +216,25 @@ class BrainService:
         user_message: str,
         chat_history: Optional[List[Tuple[str, str]]] = None,
         key_index: int = 0,
-    ) -> Tuple[str, str, int]:
+    ) -> Tuple[str, str, int, dict]:
         msg = (user_message or "").strip()
         if not msg:
-            return ("general", "empty", 0)
+            return ("general", "empty", 0, {})
 
         user_content = self._build_context(msg, chat_history)
         t0 = time.perf_counter()
 
-        category, method = self._run_llm(
+        parsed_json, method = self._run_llm(
             _PRIMARY_BRAIN_PROMPT, user_content, key_index, ALL_CATEGORIES, "general"
         )
+        
+        category = parsed_json.get("legacy_route", "general")
+        if category not in ALL_CATEGORIES:
+            category = "general"
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         logger.info("[BRAIN-PRIMARY] %s -> %s (%d ms, %s)", msg[:50], category, elapsed_ms, method)
-        return (category, method, elapsed_ms)
+        return (category, method, elapsed_ms, parsed_json)
 
     _TASK_FEW_SHOTS = [
         ("how are you?", "general how are you?"),
@@ -301,15 +310,15 @@ class BrainService:
         user_message: str,
         chat_history: Optional[List[Tuple[str, str]]] = None,
         key_index: int = 0,
-    ) -> Tuple[str, List[str], str, int]:
-        category, method1, ms1 = self.classify_primary(user_message, chat_history, key_index)
+    ) -> Tuple[str, List[str], str, int, dict]:
+        category, method1, ms1, intent_dict = self.classify_primary(user_message, chat_history, key_index)
 
         if category in ("task", "mixed"):
             task_types, method2, ms2 = self.classify_task(user_message, chat_history, key_index)
             combined_method = f"{method1}+{method2}"
-            return (category, task_types, combined_method, ms1 + ms2)
+            return (category, task_types, combined_method, ms1 + ms2, intent_dict)
 
-        return (category, [], method1, ms1)
+        return (category, [], method1, ms1, intent_dict)
 
     def extract_task_payloads(
         self, user_message: str, task_types: List[str],
@@ -459,7 +468,7 @@ Classify. Output EXACTLY ONE category name."""
     def _run_llm(
         self, system_prompt: str, user_content: str, key_index: int,
         valid_options: List[str], default: str
-    ) -> Tuple[str, str]:
+    ) -> Tuple[dict, str]:
         
         if self._llms:
             try:
@@ -470,16 +479,28 @@ Classify. Output EXACTLY ONE category name."""
                     SystemMessage(content=system_prompt),
                     HumanMessage(content=user_content),
                 ])
-                text = (response.content or "").strip().lower()
-                result = self._parse_single(text, valid_options, default)
-                return (result, "llm")
+                text = (response.content or "").strip()
+                import json
+                
+                # Cleanup markdown blocks if any
+                if text.startswith("```json"): text = text[7:]
+                if text.startswith("```"): text = text[3:]
+                if text.endswith("```"): text = text[:-3]
+                
+                try:
+                    parsed = json.loads(text.strip())
+                    return (parsed, "llm")
+                except json.JSONDecodeError:
+                    # Fallback if it returned just a word
+                    category = self._parse_single(text.lower(), valid_options, default)
+                    return ({"intent": "CHAT", "confidence": 0.5, "reasoning_level": "fast", "legacy_route": category}, "llm-fallback")
             
             except Exception as e:
                 logger.warning("[BRAIN] LLM failed: %s. Using rule-based.", e)
 
         msg = user_content.split("Current user message:")[-1].strip()[:500] if "Current user message:" in user_content else user_content[:500]
         result = self._rule_based_primary(msg)
-        return (result, "rule-based")
+        return ({"intent": "CHAT", "confidence": 1.0, "reasoning_level": "fast", "legacy_route": result}, "rule-based")
 
 
     def _parse_single(self, text: str, valid_options: List[str], default: str) -> str:

@@ -45,7 +45,27 @@ class ChatService:
         self.memory_service = memory_service
         self._state_mgr = None
         self.sessions: Dict[str, List[ChatMessage]] = {}
+        self.pending_memory_updates = {}
+        self.pending_actions = {}
+        self.current_preset = 'default'
+        self.session_presets: Dict[str, str] = {}
         self._save_lock = threading.Lock()
+
+    def set_preset(self, preset_name: str, session_id: str = None):
+        if session_id:
+            self.session_presets[session_id] = preset_name
+        else:
+            self.current_preset = preset_name
+
+    def _apply_preset_to_question(self, session_id: str, question: str) -> str:
+        preset = self.session_presets.get(session_id, self.current_preset)
+        if preset != 'default':
+            from config import PRESETS
+            addition = PRESETS.get(preset)
+            if addition:
+                return f"[SYSTEM MODE: {preset.upper()} - {addition}]\n\n{question}"
+        return question
+
 
     def _detect_remember_forget(self, message: str) -> Optional[tuple]:
         msg_lower = message.lower().strip()
@@ -181,6 +201,7 @@ class ChatService:
         if not session_id:
             new_session_id = str(uuid.uuid4())
             self.sessions[new_session_id] = []
+            self.session_presets[new_session_id] = 'default'
             logger.info(
                 "[TIMING] session_get_or_create: %.3fs (new)", 
                 time.perf_counter() - t0
@@ -201,6 +222,7 @@ class ChatService:
             return session_id
 
         if self.load_session_from_disk(session_id):
+            self.session_presets[session_id] = 'default'
             logger.info(
                 "[TIMING] session_get_or_create: %.3fs (disk)", 
                 time.perf_counter() - t0
@@ -208,6 +230,7 @@ class ChatService:
             return session_id
 
         self.sessions[session_id] = []
+        self.session_presets[session_id] = 'default'
         logger.info(
             "[TIMING] session_get_or_create: %.3fs (new_id)", 
             time.perf_counter() - t0
@@ -264,8 +287,10 @@ class ChatService:
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
         mem_prefix = ""
         if self.memory_service:
-            mem_prefix = self.memory_service.build_memory_context(session_id, user_message)
+            recent = [str(m.content) for m in self.sessions.get(session_id, [])[:-2][-3:]]
+            mem_prefix = self.memory_service.build_memory_context(session_id, user_message, recent)
         enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
+        enriched_question = self._apply_preset_to_question(session_id, enriched_question)
         
         logger.info(
             "[GENERAL] History pairs sent to LLM: %d", 
@@ -292,10 +317,15 @@ class ChatService:
         self.update_vector_store_live(session_id)
         if self.memory_service:
             _snapshot = list(self.sessions[session_id])
-            threading.Thread(
-                target=self.memory_service.maybe_summarise, 
-                args=(session_id, _snapshot, self.groq_service)
-            ).start()
+            def _run_summarise():
+                summary = self.memory_service.maybe_summarise(session_id, _snapshot, self.groq_service)
+                if summary:
+                    with self._save_lock:
+                        if len(self.sessions[session_id]) > 6:
+                            summary_msg = ChatMessage(role="system", content=f"Previous Context Summary:\n{summary}")
+                            self.sessions[session_id] = [summary_msg] + self.sessions[session_id][-6:]
+                            self.save_chat_session(session_id, log_timing=False)
+            threading.Thread(target=_run_summarise).start()
         return response
 
     def process_realtime_message(self, session_id: str, user_message: str) -> str:
@@ -311,8 +341,10 @@ class ChatService:
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
         mem_prefix = ""
         if self.memory_service:
-            mem_prefix = self.memory_service.build_memory_context(session_id, user_message)
+            recent = [str(m.content) for m in self.sessions.get(session_id, [])[:-2][-3:]]
+            mem_prefix = self.memory_service.build_memory_context(session_id, user_message, recent)
         enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
+        enriched_question = self._apply_preset_to_question(session_id, enriched_question)
         
         logger.info(
             "[REALTIME] History pairs sent to LLM: %d", 
@@ -340,11 +372,30 @@ class ChatService:
         self.update_vector_store_live(session_id)
         if self.memory_service:
             _snapshot = list(self.sessions[session_id])
-            threading.Thread(
-                target=self.memory_service.maybe_summarise, 
-                args=(session_id, _snapshot, self.groq_service)
-            ).start()
+            def _run_summarise():
+                summary = self.memory_service.maybe_summarise(session_id, _snapshot, self.groq_service)
+                if summary:
+                    with self._save_lock:
+                        if len(self.sessions[session_id]) > 6:
+                            summary_msg = ChatMessage(role="system", content=f"Previous Context Summary:\n{summary}")
+                            self.sessions[session_id] = [summary_msg] + self.sessions[session_id][-6:]
+                            self.save_chat_session(session_id, log_timing=False)
+            threading.Thread(target=_run_summarise).start()
         return response
+
+    def _yield_context_usage(self, chat_history: List[tuple], enriched_question: str) -> Dict:
+        try:
+            total_chars = sum(len(str(m[0])) + len(str(m[1])) for m in chat_history) + len(enriched_question)
+            approx_tokens = total_chars // 4
+            percentage = min(100, int((approx_tokens / 8192) * 100))
+            return {
+                "_activity": {
+                    "event": "context_usage",
+                    "percentage": percentage
+                }
+            }
+        except Exception:
+            return {}
 
     def process_message_stream(
         self, 
@@ -364,8 +415,10 @@ class ChatService:
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
         mem_prefix = ""
         if self.memory_service:
-            mem_prefix = self.memory_service.build_memory_context(session_id, user_message)
+            recent = [str(m.content) for m in self.sessions.get(session_id, [])[-4:-1]]
+            mem_prefix = self.memory_service.build_memory_context(session_id, user_message, recent)
         enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
+        enriched_question = self._apply_preset_to_question(session_id, enriched_question)
         
         logger.info(
             "[GENERAL-STREAM] History pairs sent to LLM: %d", 
@@ -392,6 +445,10 @@ class ChatService:
                 "route": "general"
             }
         }
+        
+        context_usage = self._yield_context_usage(chat_history, enriched_question)
+        if context_usage:
+            yield context_usage
 
         _, chat_idx = get_next_key_pair(len(GROQ_API_KEYS), need_brain=False)
         chunk_count = 0
@@ -436,10 +493,19 @@ class ChatService:
             self.update_vector_store_live(session_id)
             if self.memory_service:
                 _snapshot = list(self.sessions[session_id])
-                threading.Thread(
-                    target=self.memory_service.maybe_summarise, 
-                    args=(session_id, _snapshot, self.groq_service)
-                ).start()
+                def _run_summarise():
+                    summary = self.memory_service.maybe_summarise(session_id, _snapshot, self.groq_service)
+                    if summary:
+                        with self._save_lock:
+                            if len(self.sessions[session_id]) > 6:
+                                new_msgs = self.sessions[session_id][-6:]
+                                for m in new_msgs:
+                                    if m.role == "user":
+                                        m.content = f"[Previous Context Summary]\n{summary}\n\n[End Summary]\n{m.content}"
+                                        break
+                                self.sessions[session_id] = new_msgs
+                                self.save_chat_session(session_id, log_timing=False)
+                threading.Thread(target=_run_summarise).start()
 
     def process_realtime_message_stream(
         self, 
@@ -459,8 +525,10 @@ class ChatService:
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
         mem_prefix = ""
         if self.memory_service:
-            mem_prefix = self.memory_service.build_memory_context(session_id, user_message)
+            recent = [str(m.content) for m in self.sessions.get(session_id, [])[-4:-1]]
+            mem_prefix = self.memory_service.build_memory_context(session_id, user_message, recent)
         enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
+        enriched_question = self._apply_preset_to_question(session_id, enriched_question)
         
         logger.info(
             "[REALTIME-STREAM] History pairs sent to LLM: %d", 
@@ -487,6 +555,10 @@ class ChatService:
                 "route": "realtime"
             }
         }
+        
+        context_usage = self._yield_context_usage(chat_history, enriched_question)
+        if context_usage:
+            yield context_usage
 
         _, chat_idx = get_next_key_pair(len(GROQ_API_KEYS), need_brain=False)
         chunk_count = 0
@@ -532,10 +604,15 @@ class ChatService:
             self.update_vector_store_live(session_id)
             if self.memory_service:
                 _snapshot = list(self.sessions[session_id])
-                threading.Thread(
-                    target=self.memory_service.maybe_summarise, 
-                    args=(session_id, _snapshot, self.groq_service)
-                ).start()
+                def _run_summarise():
+                    summary = self.memory_service.maybe_summarise(session_id, _snapshot, self.groq_service)
+                    if summary:
+                        with self._save_lock:
+                            if len(self.sessions[session_id]) > 6:
+                                summary_msg = ChatMessage(role="system", content=f"Previous Context Summary:\n{summary}")
+                                self.sessions[session_id] = [summary_msg] + self.sessions[session_id][-6:]
+                                self.save_chat_session(session_id, log_timing=False)
+                threading.Thread(target=_run_summarise).start()
 
     def process_jarvis_message_stream(
         self, 
@@ -549,6 +626,41 @@ class ChatService:
         is_vision_requested = CAM_BYPASS_TOKEN in user_message
         clean_user_message = user_message.replace(CAM_BYPASS_TOKEN, "").strip()
         
+        msg_lower = clean_user_message.lower().strip()
+        prefix = ""
+        
+        # 1. Handle pending memory updates (Contradictions)
+        if session_id in self.pending_memory_updates:
+            pending = self.pending_memory_updates.pop(session_id)
+            if msg_lower in ("yes", "y", "yeah", "update", "do it", "sure"):
+                try:
+                    res = self.memory_service.store_knowledge(
+                        pending['content'], 
+                        self.brain_service.groq_service, 
+                        force_update_id=pending['id'], 
+                        force_category=pending['category']
+                    )
+                    yield f"Done. {res}"
+                except Exception as e:
+                    yield f"Failed to update memory: {e}"
+                return
+            else:
+                prefix = "Okay, I've discarded the new fact and kept the old memory.\n\n"
+                
+        # 2. Handle pending irreversible actions
+        elif session_id in self.pending_actions:
+            pending_action = self.pending_actions.pop(session_id)
+            if msg_lower in ("yes", "y", "yeah", "do it", "sure", "confirm"):
+                from app.services.action_broker import ActionBroker
+                res = ActionBroker.dispatch(pending_action['tool'], pending_action['args'], confirmed=True)
+                yield f"Action completed: {res}"
+                return
+            else:
+                prefix = "Action cancelled.\n\n"
+                
+        if prefix:
+            yield prefix
+        
         if self.memory_service:
             mem_cmd = self._detect_remember_forget(clean_user_message)
             if mem_cmd:
@@ -556,7 +668,20 @@ class ChatService:
                 if action == "remember":
                     # Use brain_service.groq_service (Llama 3) for lightning-fast memory categorization instead of multi-tier router
                     res = self.memory_service.store_knowledge(payload, self.brain_service.groq_service)
-                    yield f"Noted, Boss. {res}"
+                    if res.startswith("__CONTRADICT__:"):
+                        parts = res.split("::", 1)
+                        header = parts[0]
+                        explanation = parts[1] if len(parts) > 1 else "Unknown contradiction"
+                        _, match_id, cat, content = header.split(":", 3)
+                        
+                        self.pending_memory_updates[session_id] = {
+                            "id": int(match_id),
+                            "category": cat,
+                            "content": content
+                        }
+                        yield f"This conflicts with what I remember: {explanation}. Should I update it?"
+                    else:
+                        yield f"Noted, Boss. {res}"
                 elif action == "forget":
                     res = self.memory_service.forget_knowledge(payload)
                     yield f"Done, Boss. {res}"
@@ -564,6 +689,12 @@ class ChatService:
                     res = self.memory_service.forget_all()
                     yield f"Done, Boss. {res}"
                 return
+            else:
+                # Trigger passive fact extraction in background
+                threading.Thread(
+                    target=self.memory_service.extract_passive_knowledge, 
+                    args=(clean_user_message, self.brain_service.groq_service)
+                ).start()
         
         # Intercept /set_model command
         if clean_user_message.startswith("/set_model "):
@@ -638,6 +769,7 @@ class ChatService:
         if memory_ctx:
             ctx_prefix_parts.append(memory_ctx)
         enriched_jarvis_question = ("\n".join(ctx_prefix_parts) + "\n" + clean_user_message).strip() if ctx_prefix_parts else clean_user_message
+        enriched_jarvis_question = self._apply_preset_to_question(session_id, enriched_jarvis_question)
         if ctx_prefix_parts:
             logger.info("[CONTEXT] Injected screen/memory context into question (%d chars)", len("\n".join(ctx_prefix_parts)))
 
@@ -689,15 +821,15 @@ class ChatService:
         def _run_brain():
             if self.orchestrator:
                 res = self.orchestrator.route_request(clean_user_message, chat_history)
-                return (res["category"], res["task_types"], res["method"], res["elapsed_ms"])
+                return (res["category"], res["task_types"], res["method"], res["elapsed_ms"], res.get("intent_dict", {}))
             if self.brain_service and brain_idx is not None:
-                qt, tasks, r, ms = self.brain_service.classify(
+                qt, tasks, r, ms, intent_dict = self.brain_service.classify(
                     clean_user_message, 
                     chat_history, 
                     key_index=brain_idx
                 )
-                return (qt, tasks, r, ms)
-            return ("realtime", [], "No brain service", 0)
+                return (qt, tasks, r, ms, intent_dict)
+            return ("realtime", [], "No brain service", 0, {})
 
         def _run_search():
             return self.groq_service.prefetch_web_search(
@@ -710,7 +842,7 @@ class ChatService:
             future_search = executor.submit(_run_search)
 
             try:
-                query_type, tasks, reasoning, brain_elapsed_ms = future_brain.result(
+                query_type, tasks, reasoning, brain_elapsed_ms, intent_dict = future_brain.result(
                     timeout=JARVIS_BRAIN_SEARCH_TIMEOUT
                 )
 
@@ -943,11 +1075,17 @@ class ChatService:
         t0 = time.perf_counter()
 
         try:
+            from app.tools.registry import ToolRegistry
+            relevant_tools = list(ToolRegistry.get_relevant_tools(enriched_jarvis_question, top_k=5).values())
+            tools_str = "\nAvailable Tools (You can instruct the user to run them if needed):\n" + "\n".join([f"- {t.name}: {t.description}" for t in relevant_tools]) if relevant_tools else ""
+            
             if query_type == "general":
                 stream = self.groq_service.stream_response(
                     question=enriched_jarvis_question, 
                     chat_history=chat_history, 
-                    key_start_index=chat_idx
+                    key_start_index=chat_idx,
+                    tools_str=tools_str,
+                    intent_dict=intent_dict
                 )
 
             else:
@@ -957,6 +1095,8 @@ class ChatService:
                     formatted_results=formatted_results,
                     payload=search_payload,
                     key_start_index=chat_idx,
+                    tools_str=tools_str,
+                    intent_dict=intent_dict
                 )
 
             for chunk in stream:
