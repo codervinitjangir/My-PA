@@ -13,7 +13,7 @@ from app.providers.base_provider import BaseProvider
 from app.services.vector_store import VectorStoreService
 from app.utils.time_info import get_time_information
 from config import (
-    GEMINI_API_KEY,
+    GEMINI_API_KEYS,
     JARVIS_SYSTEM_PROMPT,
     GENERAL_CHAT_ADDENDUM,
     REALTIME_CHAT_ADDENDUM,
@@ -61,10 +61,10 @@ class GeminiProvider(BaseProvider):
             raise GeminiUnavailableError(
                 "google-genai package not installed. Run: pip install google-genai"
             )
-        if not GEMINI_API_KEY:
+        if not GEMINI_API_KEYS:
             raise GeminiUnavailableError("GEMINI_API_KEY not set in environment.")
 
-        self._client = _genai_client_cls(api_key=GEMINI_API_KEY)
+        self._clients = [_genai_client_cls(api_key=k) for k in GEMINI_API_KEYS]
         self.vector_store_service = vector_store_service
         logger.info("[Gemini] Provider initialized (model: %s)", self.MODEL)
 
@@ -154,17 +154,28 @@ class GeminiProvider(BaseProvider):
         contents = self._build_contents(question, chat_history)
 
         t0 = time.perf_counter()
-        response = self._client.models.generate_content(
-            model=self.MODEL,
-            contents=contents,
-            config=_genai_types.GenerateContentConfig(
-                system_instruction=system,
-                temperature=0.5,
-                max_output_tokens=4096,
-            ),
-        )
-        logger.info("[Gemini] get_response: %.3fs", time.perf_counter() - t0)
-        return response.text or ""
+        last_exc = None
+        n = len(self._clients)
+        for j in range(n):
+            i = (key_start_index + j) % n
+            try:
+                response = self._clients[i].models.generate_content(
+                    model=self.MODEL,
+                    contents=contents,
+                    config=_genai_types.GenerateContentConfig(
+                        system_instruction=system,
+                        temperature=0.5,
+                        max_output_tokens=4096,
+                    ),
+                )
+                logger.info("[Gemini] get_response: %.3fs", time.perf_counter() - t0)
+                return response.text or ""
+            except Exception as e:
+                last_exc = e
+                if j < n - 1: continue
+                break
+        
+        raise last_exc
 
     def stream_response(
         self,
@@ -181,21 +192,32 @@ class GeminiProvider(BaseProvider):
         system = self._build_system_prompt(question, chat_history, extra_parts=extra if extra else None, mode_addendum=mode)
         contents = self._build_contents(question, chat_history)
 
-        for chunk in self._client.models.generate_content_stream(
-            model=self.MODEL,
-            contents=contents,
-            config=_genai_types.GenerateContentConfig(
-                system_instruction=system,
-                temperature=0.5,
-                max_output_tokens=4096,
-            ),
-        ):
+        last_exc = None
+        n = len(self._clients)
+        for j in range(n):
+            i = (key_start_index + j) % n
             try:
-                text = chunk.text
-                if text:
-                    yield text
-            except Exception:
-                pass   # safety/metadata chunks with no text — skip
+                for chunk in self._clients[i].models.generate_content_stream(
+                    model=self.MODEL,
+                    contents=contents,
+                    config=_genai_types.GenerateContentConfig(
+                        system_instruction=system,
+                        temperature=0.5,
+                        max_output_tokens=4096,
+                    ),
+                ):
+                    try:
+                        text = chunk.text
+                        if text:
+                            yield text
+                    except Exception:
+                        pass   # safety/metadata chunks with no text - skip
+                return
+            except Exception as e:
+                last_exc = e
+                if j < n - 1: continue
+                break
+        raise last_exc
 
     def stream_response_with_prefetched(
         self,
@@ -216,21 +238,32 @@ class GeminiProvider(BaseProvider):
         )
         contents = self._build_contents(question, chat_history)
 
-        for chunk in self._client.models.generate_content_stream(
-            model=self.MODEL,
-            contents=contents,
-            config=_genai_types.GenerateContentConfig(
-                system_instruction=system,
-                temperature=0.5,
-                max_output_tokens=4096,
-            ),
-        ):
+        last_exc = None
+        n = len(self._clients)
+        for j in range(n):
+            i = (key_start_index + j) % n
             try:
-                text = chunk.text
-                if text:
-                    yield text
-            except Exception:
-                pass
+                for chunk in self._clients[i].models.generate_content_stream(
+                    model=self.MODEL,
+                    contents=contents,
+                    config=_genai_types.GenerateContentConfig(
+                        system_instruction=system,
+                        temperature=0.5,
+                        max_output_tokens=4096,
+                    ),
+                ):
+                    try:
+                        text = chunk.text
+                        if text:
+                            yield text
+                    except Exception:
+                        pass
+                return
+            except Exception as e:
+                last_exc = e
+                if j < n - 1: continue
+                break
+        raise last_exc
 
     def prefetch_web_search(
         self,

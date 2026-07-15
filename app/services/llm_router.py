@@ -281,6 +281,7 @@ class LLMRouter:
         formatted_results: Optional[str] = None,
         payload: Optional[dict] = None,
         key_start_index: int = 0,
+        **kwargs
     ) -> Iterator[Any]:
         """
         Streaming with pre-fetched search results. Same 4-tier routing.

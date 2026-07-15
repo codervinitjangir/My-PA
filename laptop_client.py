@@ -16,7 +16,7 @@ load_dotenv()
 JARVIS_API_TOKEN = os.getenv("JARVIS_API_TOKEN", "").strip()
 
 # Replace with your actual Render URL
-RENDER_URL = "wss://jarvis-mcaj.onrender.com/laptop/ws"
+RENDER_URL = "ws://127.0.0.1:8000/laptop/ws"
 
 if JARVIS_API_TOKEN:
     RENDER_URL += f"?token={JARVIS_API_TOKEN}"

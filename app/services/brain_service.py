@@ -489,6 +489,9 @@ Classify. Output EXACTLY ONE category name."""
                 
                 try:
                     parsed = json.loads(text.strip())
+                    if isinstance(parsed, str):
+                        category = self._parse_single(parsed.lower(), valid_options, default)
+                        return ({"intent": "CHAT", "confidence": 0.5, "reasoning_level": "fast", "legacy_route": category}, "llm-fallback-str")
                     return (parsed, "llm")
                 except json.JSONDecodeError:
                     # Fallback if it returned just a word

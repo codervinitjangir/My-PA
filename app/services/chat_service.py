@@ -821,7 +821,7 @@ class ChatService:
 
         def _run_brain():
             if self.orchestrator:
-                return self.orchestrator.route_request(clean_user_message, chat_history, llm_router=self.llm_router)
+                return self.orchestrator.route_request(clean_user_message, chat_history, llm_router=self.groq_service)
             if self.brain_service and brain_idx is not None:
                 qt, tasks, r, ms, intent_dict = self.brain_service.classify(
                     clean_user_message, 
@@ -837,7 +837,8 @@ class ChatService:
                 chat_history
             )
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        executor = ThreadPoolExecutor(max_workers=2)
+        try:
             future_brain = executor.submit(_run_brain)
             future_search = executor.submit(_run_search)
 
@@ -865,6 +866,7 @@ class ChatService:
 
             if query_type == "general":
                 formatted_results, search_payload = "", None
+                # We do not wait for future_search here.
 
             else:
                 try:
@@ -878,6 +880,8 @@ class ChatService:
                         JARVIS_BRAIN_SEARCH_TIMEOUT
                     )
                     formatted_results, search_payload = "", None
+        finally:
+            executor.shutdown(wait=False)
 
         logger.info(
             "[JARVIS] Brain: %s in %d ms - %s", 
@@ -1129,6 +1133,14 @@ class ChatService:
 
         except Exception as e:
             logger.error("[JARVIS-STREAM] Exception during stream: %s", e, exc_info=True)
+            if chunk_count == 0:
+                yield {
+                    "_activity": {
+                        "event": "first_chunk", 
+                        "route": query_type, 
+                        "elapsed_ms": int((time.perf_counter() - t0) * 1000)
+                    }
+                }
             error_msg = f"\n\n[System: I encountered an error while processing that: {str(e)}]"
             self.sessions[session_id][-1].content += error_msg
             yield error_msg

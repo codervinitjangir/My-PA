@@ -97,6 +97,7 @@ class GroqProvider(BaseProvider):
                 temperature=0.5,
                 max_tokens=4096,
                 request_timeout=GROQ_REQUEST_TIMEOUT,
+                max_retries=0,
                 model_kwargs={"frequency_penalty": 0.3},
             )
             for key in GROQ_API_KEYS
@@ -121,6 +122,7 @@ class GroqProvider(BaseProvider):
                 temperature=0.0,
                 request_timeout=GROQ_REQUEST_TIMEOUT_FAST,
                 max_tokens=50,
+                max_retries=0,
             )
         else:
             self._fast_llm = None

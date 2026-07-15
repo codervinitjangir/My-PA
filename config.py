@@ -51,8 +51,21 @@ TASK_EXECUTION_TIMEOUT = int(os.getenv("TASK_EXECUTION_TIMEOUT", "30"))
 GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 VISION_MAX_IMAGE_BYTES = int(os.getenv("VISION_MAX_IMAGE_BYTES", "5000000"))
 
+def _load_gemini_api_keys() -> list:
+    keys = []
+    first = os.getenv("GEMINI_API_KEY", "").strip()
+    if first: keys.append(first)
+    i = 2
+    while True:
+        k = os.getenv(f"GEMINI_API_KEY_{i}", "").strip()
+        if not k: break
+        keys.append(k)
+        i += 1
+    return keys
+
 # ── LLM Router — multi-tier fallback ──────────────────────────────────────────
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEYS = _load_gemini_api_keys()
+GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else ""
 AGENTROUTER_API_KEY = os.getenv("AGENTROUTER_API_KEY", "")
 AGENTROUTER_BASE_URL = os.getenv("AGENTROUTER_BASE_URL", "")
 DEEP_MODEL = os.getenv("DEEP_MODEL", "claude-opus-4-8")   # Tier 3 model on AgentRouter

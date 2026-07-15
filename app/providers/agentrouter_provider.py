@@ -70,7 +70,8 @@ class AgentRouterProvider(BaseProvider):
         self.client = _openai_module.OpenAI(
             base_url=AGENTROUTER_BASE_URL,
             api_key=AGENTROUTER_API_KEY,
-            timeout=60.0,
+            timeout=10.0,
+            max_retries=0,
             default_headers={"User-Agent": "RooCode/1.0"}  # Bypass anti-client fingerprinting
         )
         self.fast_model = fast_model
