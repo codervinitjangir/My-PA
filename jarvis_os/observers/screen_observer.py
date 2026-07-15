@@ -103,7 +103,12 @@ class ScreenObserver:
     def capture_screen(self) -> Optional[bytes]:
         """
         Check cooldown, then capture a single screenshot in-memory.
-        Returns raw PNG bytes, or None if still in cooldown.
+
+        - If running locally: uses PIL.ImageGrab directly.
+        - If running in the cloud (Render): delegates to the laptop companion
+          client via WebSocket and decodes the base64 response.
+
+        Returns raw JPEG bytes, or raises on error.
         """
         elapsed = time.time() - self._last_analyzed
         if elapsed < SCREEN_ANALYZE_COOLDOWN:
@@ -112,6 +117,14 @@ class ScreenObserver:
                 f"Please wait {remaining} more second(s) before analyzing again."
             )
 
+        from config import IS_CLOUD
+        if IS_CLOUD:
+            return self._capture_via_laptop()
+        else:
+            return self._capture_local()
+
+    def _capture_local(self) -> Optional[bytes]:
+        """Direct PIL screenshot capture for local use."""
         try:
             from PIL import ImageGrab
             img = ImageGrab.grab()
@@ -120,15 +133,38 @@ class ScreenObserver:
             raw_bytes = buf.getvalue()
             buf.close()
             img.close()
-            logger.info("[SCREEN] Screenshot captured (%d bytes).", len(raw_bytes))
+            logger.info("[SCREEN] Screenshot captured locally (%d bytes).", len(raw_bytes))
+            self._last_analyzed = time.time()
             return raw_bytes
         except ImportError:
-            raise RuntimeError(
-                "Pillow is not installed. Run: pip install Pillow"
-            )
+            raise RuntimeError("Pillow is not installed. Run: pip install Pillow")
         except Exception as e:
-            logger.warning("[SCREEN] Capture failed: %s", e)
+            logger.warning("[SCREEN] Local capture failed: %s", e)
             raise
+
+    def _capture_via_laptop(self) -> Optional[bytes]:
+        """Delegate screenshot capture to laptop companion via WebSocket."""
+        from app.websocket_manager import laptop_manager
+        if not laptop_manager.is_connected():
+            raise RuntimeError(
+                "Laptop companion is not connected. Please run start_client.bat on your laptop."
+            )
+
+        logger.info("[SCREEN] Requesting screenshot from laptop companion...")
+        resp = laptop_manager.send_and_wait("capture_screen", timeout=20)
+
+        if resp.get("status") != "success":
+            err = resp.get("message", "Unknown error")
+            raise RuntimeError(f"Laptop failed to capture screen: {err}")
+
+        b64 = resp.get("image_b64", "")
+        if not b64:
+            raise RuntimeError("Laptop returned empty screenshot data.")
+
+        raw_bytes = base64.b64decode(b64)
+        logger.info("[SCREEN] Screenshot received from laptop (%d bytes).", len(raw_bytes))
+        self._last_analyzed = time.time()
+        return raw_bytes
 
     def sanitize_data(self, image_bytes: bytes) -> str:
         """

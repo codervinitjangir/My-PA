@@ -64,10 +64,25 @@ def _generate_tts_sync(text: str, voice: str, rate: str) -> bytes:
     return generate_tts_bytes(text, voice, rate)
 
 def is_hindi_text(text: str) -> bool:
-    """Check if the text contains Devanagari (Hindi) characters."""
+    """Check if the text contains Devanagari (Hindi) characters or common Hinglish words."""
+    # Check for Devanagari script first
     for char in text:
         if '\u0900' <= char <= '\u097F':
             return True
+            
+    # Check for common Hinglish keywords (case-insensitive, whole words)
+    import re
+    hinglish_keywords = {
+        r'\bhai\b', r'\bkaise\b', r'\bho\b', r'\bmera\b', r'\bmujhe\b', 
+        r'\bkya\b', r'\btoh\b', r'\bkuch\b', r'\bnahi\b', r'\byaar\b',
+        r'\baccha\b', r'\bthik\b', r'\bhaan\b', r'\bkyu\b', r'\bmatlab\b'
+    }
+    
+    text_lower = text.lower()
+    for keyword in hinglish_keywords:
+        if re.search(keyword, text_lower):
+            return True
+            
     return False
 
 _tts_pool = ThreadPoolExecutor(max_workers=4)
@@ -83,9 +98,10 @@ def _stream_generator(session_id: str, chunk_iter, is_realtime: bool, tts_enable
 
     def _submit(text):
         nonlocal last_submit_time
+        from config import TTS_VOICE, TTS_RATE
         if not text or not text.strip():
             return
-        voice = "hi-IN-MadhurNeural" if is_hindi_text(text) else "en-GB-RyanNeural"
+        voice = "hi-IN-MadhurNeural" if is_hindi_text(text) else TTS_VOICE
         audio_queue.append((_tts_pool.submit(_generate_tts_sync, text, voice, TTS_RATE), text))
         last_submit_time = time.perf_counter()
 

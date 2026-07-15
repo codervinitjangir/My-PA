@@ -465,7 +465,38 @@ async def start_telegram_bot(chat_service):
     if not token:
         logger.warning("[TELEGRAM] Bot token not set, skipping.")
         return None
-        
+
+    # ── Conflict Guard ──────────────────────────────────────────────────────
+    # When running locally while a Render server is also live, avoid the
+    # 409 "Conflict: terminated by other getUpdates request" spam by checking
+    # if another polling session is active. If so, skip local polling.
+    from config import IS_CLOUD
+    if not IS_CLOUD:
+        skip_polling = os.getenv("TELEGRAM_SKIP_POLLING", "false").lower() == "true"
+        if skip_polling:
+            logger.info("[TELEGRAM] TELEGRAM_SKIP_POLLING=true — skipping local bot polling.")
+            logger.info("[TELEGRAM] Your Render server is handling Telegram. This is correct.")
+            return None
+
+        # Auto-detect: try getUpdates; if 409 Conflict, skip gracefully
+        try:
+            import httpx
+            resp = httpx.get(
+                f"https://api.telegram.org/bot{token}/getUpdates",
+                timeout=5
+            )
+            data = resp.json()
+            if not data.get("ok") and data.get("error_code") == 409:
+                logger.warning(
+                    "[TELEGRAM] Another bot instance is already running (Render server?). "
+                    "Skipping local polling to avoid conflicts. "
+                    "Set TELEGRAM_SKIP_POLLING=true in .env to silence this check."
+                )
+                return None
+        except Exception:
+            pass  # If the check itself fails, proceed normally
+    # ────────────────────────────────────────────────────────────────────────
+
     application = ApplicationBuilder().token(token).build()
     application.bot_data["chat_service"] = chat_service
     application.bot_data["memory_service"] = getattr(chat_service, 'memory_service', None)

@@ -739,7 +739,8 @@ async def chat(chat_req: ChatRequest, request: Request, x_api_key: Optional[str]
         logger.error("[API /chat] Error: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
-from app.utils.stream_utils import _stream_generator, _tts_pool
+from app.utils.stream_utils import _stream_generator, _tts_pool, is_hindi_text
+from app.utils.time_info import get_time_information
 
 @app.post("/chat/stream")
 @limiter.limit("60/minute")

@@ -645,6 +645,19 @@ Classify. Output EXACTLY ONE category name."""
                  "how are you", "what's up", "thanks", "thank you", "bye", "goodbye"):
             return "general"
 
+        # Email / mail check — must be before camera block to prevent misrouting
+        # (e.g. "check my last mail" was hitting the camera detector via "check")
+        email_patterns = [
+            "check mail", "check my mail", "check email", "check my email",
+            "check my last mail", "check my last email", "read my mail", "read mail",
+            "read my email", "read email", "any mail", "any email", "any mails",
+            "show my mail", "show mail", "unread mail", "unread email",
+            "my inbox", "check inbox", "latest mail", "recent mail",
+            "okie check my", "open my mail",
+        ]
+        if any(x in m for x in email_patterns):
+            return "task"
+
         if any(x in m for x in ["what do you see", "what can you see", "what am i holding",
                                   "what is this", "describe this", "identify this",
                                   "what's in my hand", "look at this", "read this",
