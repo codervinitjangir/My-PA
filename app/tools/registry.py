@@ -82,7 +82,16 @@ class ToolRegistry:
             scored_tools.append((score, name, tool))
             
         scored_tools.sort(key=lambda x: x[0], reverse=True)
-        return {name: tool for score, name, tool in scored_tools[:top_k] if score > 0}
+        
+        # Always include core tools if they exist
+        core_tools = {"advanced_browser", "execute_python", "execute_skill"}
+        selected = {name: tool for score, name, tool in scored_tools[:top_k] if score > 0}
+        
+        for core in core_tools:
+            if core in cls._tools and core not in selected:
+                selected[core] = cls._tools[core]
+                
+        return selected
 
     @classmethod
     def load_tools(cls, package_name: str = "app.tools"):

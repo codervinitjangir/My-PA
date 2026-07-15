@@ -306,10 +306,14 @@ async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         vision = VisionService()
         raw_text = vision.analyze_image(prompt=_SCREEN_PROMPT, img_base64=img_b64)
-        del img_b64
 
         screen_state = observer.parse_response(raw_text)
         _state_mgr.update_runtime_state("screen", screen_state.model_dump())
+
+        import base64
+        raw_b64 = img_b64.split(",")[1] if "," in img_b64 else img_b64
+        image_bytes_decoded = base64.b64decode(raw_b64)
+        del img_b64
 
         reply = (
             f"Screen analyzed, Boss.\n\n"
@@ -319,12 +323,85 @@ async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Summary: {screen_state.summary}\n"
             f"Suggestion: {screen_state.next_best_action}"
         )
+        await update.message.reply_photo(photo=image_bytes_decoded)
         await update.message.reply_text(reply)
 
     except CooldownError as e:
         await update.message.reply_text(f"Cooldown active, Boss. {e}")
     except Exception as e:
         await update.message.reply_text(f"Screen analysis failed: {e}")
+
+@owner_only
+async def press_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Press a keyboard shortcut on the laptop."""
+    if not context.args:
+        await update.message.reply_text("Usage: /press <shortcut> (e.g. ctrl+s)")
+        return
+    shortcut = " ".join(context.args)
+    from config import IS_CLOUD
+    if IS_CLOUD:
+        from app.websocket_manager import laptop_manager
+        resp = await laptop_manager.send_and_wait_async("keyboard_shortcut", {"shortcut": shortcut})
+        await update.message.reply_text(resp.get("message", "Sent shortcut command"))
+    else:
+        try:
+            import keyboard
+            keyboard.send(shortcut)
+            await update.message.reply_text(f"Pressed {shortcut}")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {e}")
+
+@owner_only
+async def type_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Type text on the laptop."""
+    if not context.args:
+        await update.message.reply_text("Usage: /type <text>")
+        return
+    text = " ".join(context.args)
+    from config import IS_CLOUD
+    if IS_CLOUD:
+        from app.websocket_manager import laptop_manager
+        resp = await laptop_manager.send_and_wait_async("type_text", {"text": text})
+        await update.message.reply_text(resp.get("message", "Sent type command"))
+    else:
+        try:
+            import keyboard
+            keyboard.write(text, delay=0.01)
+            await update.message.reply_text("Typed text")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {e}")
+
+@owner_only
+async def scroll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Scroll on the laptop."""
+    if not context.args:
+        await update.message.reply_text("Usage: /scroll <up|down> [amount]")
+        return
+    direction = context.args[0].lower()
+    if direction not in ["up", "down"]:
+        await update.message.reply_text("Direction must be 'up' or 'down'")
+        return
+    amount = 500
+    if len(context.args) > 1:
+        try:
+            amount = int(context.args[1])
+        except ValueError:
+            await update.message.reply_text("Amount must be a number")
+            return
+            
+    from config import IS_CLOUD
+    if IS_CLOUD:
+        from app.websocket_manager import laptop_manager
+        resp = await laptop_manager.send_and_wait_async("scroll", {"direction": direction, "amount": amount})
+        await update.message.reply_text(resp.get("message", "Sent scroll command"))
+    else:
+        try:
+            import pyautogui
+            scroll_amount = amount if direction == "up" else -amount
+            pyautogui.scroll(scroll_amount)
+            await update.message.reply_text(f"Scrolled {direction} by {amount}")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {e}")
 
 @owner_only
 async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -398,6 +475,9 @@ async def start_telegram_bot(chat_service):
     application.add_handler(CommandHandler("cal", cal_command))
     application.add_handler(CommandHandler("mail", mail_command))
     application.add_handler(CommandHandler("screen", screen_command))
+    application.add_handler(CommandHandler("press", press_command))
+    application.add_handler(CommandHandler("type", type_command))
+    application.add_handler(CommandHandler("scroll", scroll_command))
     application.add_handler(CommandHandler("sendfile", sendfile_command))
     application.add_handler(CommandHandler("memory", memory_command))
     application.add_handler(CommandHandler("forget", forget_command))

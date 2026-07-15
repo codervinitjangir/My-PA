@@ -62,6 +62,49 @@ async def handle_command(command: dict) -> dict:
         except Exception as e:
             return {"status": "error", "message": str(e)}
             
+    elif action == "keyboard_shortcut":
+        shortcut = payload.get("shortcut")
+        if shortcut:
+            try:
+                import keyboard
+                keyboard.send(shortcut)
+                return {"status": "success", "message": f"Pressed {shortcut}"}
+            except ImportError:
+                return {"status": "error", "message": "keyboard is not installed. Run pip install keyboard"}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "No shortcut provided"}
+
+    elif action == "type_text":
+        text = payload.get("text")
+        if text:
+            try:
+                import keyboard
+                keyboard.write(text, delay=0.01)
+                return {"status": "success", "message": f"Typed text"}
+            except ImportError:
+                return {"status": "error", "message": "keyboard is not installed. Run pip install keyboard"}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "No text provided"}
+
+    elif action == "scroll":
+        direction = payload.get("direction")
+        amount = payload.get("amount", 500)
+        if direction:
+            try:
+                import pyautogui
+                # Disable failsafe just for scrolling since it doesn't move the mouse
+                pyautogui.FAILSAFE = False
+                # Positive is usually up on Windows, negative is down
+                scroll_amount = amount if direction == "up" else -amount
+                pyautogui.scroll(scroll_amount)
+                return {"status": "success", "message": f"Scrolled {direction} by {amount}"}
+            except ImportError:
+                return {"status": "error", "message": "pyautogui is not installed. Run pip install pyautogui"}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "No direction provided"}
     else:
         return {"status": "error", "message": f"Unknown action: {action}"}
 

@@ -32,7 +32,19 @@ def get_google_credentials():
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                print(f"Token refresh failed: {e}. Re-authenticating...")
+                if os.path.exists(TOKEN_FILE):
+                    os.remove(TOKEN_FILE)
+                if not os.path.exists(CREDENTIALS_FILE):
+                    raise FileNotFoundError(
+                        f"{CREDENTIALS_FILE} not found. Please follow the Google Cloud Setup Instructions "
+                        "at the top of app/plugins/calendar_tool.py."
+                    )
+                flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+                creds = flow.run_local_server(port=8080)
         else:
             if not os.path.exists(CREDENTIALS_FILE):
                 raise FileNotFoundError(

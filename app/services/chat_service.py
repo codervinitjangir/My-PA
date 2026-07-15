@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Iterator, Any, Union
 import uuid
 import threading
+from threading import Thread, Lock
 
 from config import CHATS_DATA_DIR, MAX_CHAT_HISTORY_TURNS, GROQ_API_KEYS
 from app.models import ChatMessage
@@ -49,7 +50,7 @@ class ChatService:
         self.pending_actions = {}
         self.current_preset = 'default'
         self.session_presets: Dict[str, str] = {}
-        self._save_lock = threading.Lock()
+        self._save_lock = Lock()
 
     def set_preset(self, preset_name: str, session_id: str = None):
         if session_id:
@@ -325,7 +326,7 @@ class ChatService:
                             summary_msg = ChatMessage(role="system", content=f"Previous Context Summary:\n{summary}")
                             self.sessions[session_id] = [summary_msg] + self.sessions[session_id][-6:]
                             self.save_chat_session(session_id, log_timing=False)
-            threading.Thread(target=_run_summarise).start()
+            Thread(target=_run_summarise).start()
         return response
 
     def process_realtime_message(self, session_id: str, user_message: str) -> str:
@@ -380,7 +381,7 @@ class ChatService:
                             summary_msg = ChatMessage(role="system", content=f"Previous Context Summary:\n{summary}")
                             self.sessions[session_id] = [summary_msg] + self.sessions[session_id][-6:]
                             self.save_chat_session(session_id, log_timing=False)
-            threading.Thread(target=_run_summarise).start()
+            Thread(target=_run_summarise).start()
         return response
 
     def _yield_context_usage(self, chat_history: List[tuple], enriched_question: str) -> Dict:
@@ -505,7 +506,7 @@ class ChatService:
                                         break
                                 self.sessions[session_id] = new_msgs
                                 self.save_chat_session(session_id, log_timing=False)
-                threading.Thread(target=_run_summarise).start()
+                Thread(target=_run_summarise).start()
 
     def process_realtime_message_stream(
         self, 
@@ -612,7 +613,7 @@ class ChatService:
                                 summary_msg = ChatMessage(role="system", content=f"Previous Context Summary:\n{summary}")
                                 self.sessions[session_id] = [summary_msg] + self.sessions[session_id][-6:]
                                 self.save_chat_session(session_id, log_timing=False)
-                threading.Thread(target=_run_summarise).start()
+                Thread(target=_run_summarise).start()
 
     def process_jarvis_message_stream(
         self, 
@@ -691,7 +692,7 @@ class ChatService:
                 return
             else:
                 # Trigger passive fact extraction in background
-                threading.Thread(
+                Thread(
                     target=self.memory_service.extract_passive_knowledge, 
                     args=(clean_user_message, self.brain_service.groq_service)
                 ).start()
@@ -805,7 +806,7 @@ class ChatService:
             
             try:
                 from app.telegram_bot import background_sendfile
-                threading.Thread(target=background_sendfile, args=(file_query,)).start()
+                Thread(target=background_sendfile, args=(file_query,)).start()
             except Exception as e:
                 logger.error(f"Failed to start background sendfile thread: {e}")
                 
@@ -1144,7 +1145,7 @@ class ChatService:
             self.update_vector_store_live(session_id)
             if self.memory_service:
                 _snapshot = list(self.sessions[session_id])
-                threading.Thread(
+                Thread(
                     target=self.memory_service.maybe_summarise, 
                     args=(session_id, _snapshot, self.groq_service)
                 ).start()
