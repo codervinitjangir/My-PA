@@ -61,6 +61,9 @@ class AgentRouterProvider(BaseProvider):
                 "AGENTROUTER_BASE_URL and AGENTROUTER_API_KEY must be set in .env"
             )
 
+        import os
+        PROXY_SECRET = os.getenv("PROXY_SECRET", "default-proxy-secret-12345")
+        
         self._base_url = AGENTROUTER_BASE_URL.rstrip("/")
         self._chat_url = f"{self._base_url}/chat/completions"
         # Minimal headers — no SDK fingerprinting
@@ -68,6 +71,7 @@ class AgentRouterProvider(BaseProvider):
             "Authorization": f"Bearer {AGENTROUTER_API_KEY}",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "X-Proxy-Secret": PROXY_SECRET,
         }
         self.fast_model = fast_model
         self.deep_model = deep_model

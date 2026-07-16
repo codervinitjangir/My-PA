@@ -350,7 +350,7 @@ app.add_middleware(
 # ── Security: Bearer token auth (only active when JARVIS_API_TOKEN is set) ────
 _JARVIS_TOKEN = os.getenv("JARVIS_API_TOKEN", "").strip()
 _AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config", "/telegram/webhook"}
-_AUTH_PUBLIC_PREFIXES = ("/app", "/proxy/")  # /proxy/* uses its own internal auth
+_AUTH_PUBLIC_PREFIXES = ("/app",)
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -428,6 +428,11 @@ async def laptop_websocket_endpoint(websocket: WebSocket, token: str = None):
 
 _AR_TARGET = "https://agentrouter.org/v1"
 _AR_PROXY_KEY = os.getenv("AGENTROUTER_API_KEY", "")
+_PROXY_SECRET = os.getenv("PROXY_SECRET", "default-proxy-secret-12345")
+
+import time
+from collections import defaultdict
+_proxy_rate_limits = defaultdict(list)
 
 @app.api_route(
     "/proxy/agentrouter/v1/{path:path}",
@@ -440,6 +445,19 @@ async def agentrouter_proxy(path: str, request: Request):
     Forwards any request to https://agentrouter.org/v1/{path} using
     Render's server IP (which is not blocked by AgentRouter WAF).
     """
+    # ── Security 1: Shared Secret Check ──
+    client_secret = request.headers.get("X-Proxy-Secret", "")
+    if client_secret != _PROXY_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid Proxy Secret")
+
+    # ── Security 2: Rate Limiting ──
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    _proxy_rate_limits[client_ip] = [t for t in _proxy_rate_limits[client_ip] if now - t < 60]
+    if len(_proxy_rate_limits[client_ip]) > 20:  # max 20 requests per minute
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    _proxy_rate_limits[client_ip].append(now)
+
     import httpx as _httpx
 
     target_url = f"{_AR_TARGET}/{path}"
