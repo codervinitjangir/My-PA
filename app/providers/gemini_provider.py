@@ -171,6 +171,7 @@ class GeminiProvider(BaseProvider):
                 logger.info("[Gemini] get_response: %.3fs", time.perf_counter() - t0)
                 return response.text or ""
             except Exception as e:
+                logger.warning("[Gemini] Request failed with key %d (error: %s). Rotating to next key...", i + 1, str(e)[:100])
                 last_exc = e
                 if j < n - 1: continue
                 break
@@ -214,6 +215,7 @@ class GeminiProvider(BaseProvider):
                         pass   # safety/metadata chunks with no text - skip
                 return
             except Exception as e:
+                logger.warning("[Gemini] Stream failed with key %d (error: %s). Rotating to next key...", i + 1, str(e)[:100])
                 last_exc = e
                 if j < n - 1: continue
                 break
@@ -260,6 +262,7 @@ class GeminiProvider(BaseProvider):
                         pass
                 return
             except Exception as e:
+                logger.warning("[Gemini] Prefetched stream failed with key %d (error: %s). Rotating to next key...", i + 1, str(e)[:100])
                 last_exc = e
                 if j < n - 1: continue
                 break
