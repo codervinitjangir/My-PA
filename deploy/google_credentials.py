@@ -32,7 +32,11 @@ def restore_google_credentials():
         try:
             token_path = Path("database/google_token.json")
             token_path.parent.mkdir(parents=True, exist_ok=True)
-            token_path.write_bytes(base64.b64decode(token_b64))
-            logger.info("[CLOUD] google_token.json restored from env var")
+            token_bytes = base64.b64decode(token_b64)
+            token_path.write_bytes(token_bytes)
+            logger.info(
+                "[CLOUD] google_token.json restored from env var (%d bytes written to %s)",
+                len(token_bytes), token_path.resolve()
+            )
         except Exception as e:
             logger.warning("[CLOUD] Could not restore google_token.json: %s", e)
