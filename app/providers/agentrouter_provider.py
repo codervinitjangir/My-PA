@@ -62,13 +62,19 @@ class AgentRouterProvider(BaseProvider):
             )
 
         import os
+        from config import JARVIS_API_TOKEN
         PROXY_SECRET = os.getenv("PROXY_SECRET", "default-proxy-secret-12345")
         
         self._base_url = AGENTROUTER_BASE_URL.rstrip("/")
         self._chat_url = f"{self._base_url}/chat/completions"
+        
+        # If pointing to the proxy, we must authenticate with the JARVIS API Token
+        # The proxy itself will inject the AGENTROUTER_API_KEY before forwarding.
+        auth_token = JARVIS_API_TOKEN if "/proxy/" in self._base_url else AGENTROUTER_API_KEY
+        
         # Minimal headers — no SDK fingerprinting
         self._headers = {
-            "Authorization": f"Bearer {AGENTROUTER_API_KEY}",
+            "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
             "X-Proxy-Secret": PROXY_SECRET,
