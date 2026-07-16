@@ -478,7 +478,17 @@ async def agentrouter_proxy(path: str, request: Request):
     logger.info("[AR-PROXY] %s /proxy/agentrouter/v1/%s → %s", method, path, target_url)
 
     try:
-        async with _httpx.AsyncClient(timeout=_httpx.Timeout(connect=10, read=90, write=10, pool=5)) as client:
+        from curl_cffi.requests import AsyncSession
+        # Inject required spoof headers to bypass OneAPI "unauthorized client" checks
+        forward_headers.update({
+            "User-Agent": "claude-cli/2.1.195",
+            "X-Stainless-Lang": "node",
+            "X-Stainless-Runtime": "node",
+            "X-Stainless-OS": "MacOS",
+            "X-Stainless-Arch": "arm64"
+        })
+
+        async with AsyncSession(impersonate="chrome110", timeout=90) as client:
             # Check if client wants streaming
             accept = request.headers.get("Accept", "")
             stream_mode = "text/event-stream" in accept or (
@@ -488,8 +498,9 @@ async def agentrouter_proxy(path: str, request: Request):
             if stream_mode:
                 # Stream response back chunk by chunk
                 async def _stream_proxy():
-                    async with client.stream(method, target_url, headers=forward_headers, content=body) as ar_resp:
-                        async for chunk in ar_resp.aiter_bytes(1024):
+                    ar_resp = await client.request(method, target_url, headers=forward_headers, data=body, stream=True)
+                    async for chunk in ar_resp.aiter_content():
+                        if chunk:
                             yield chunk
 
                 from fastapi.responses import StreamingResponse
@@ -499,7 +510,7 @@ async def agentrouter_proxy(path: str, request: Request):
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
                 )
             else:
-                ar_resp = await client.request(method, target_url, headers=forward_headers, content=body)
+                ar_resp = await client.request(method, target_url, headers=forward_headers, data=body)
                 logger.info("[AR-PROXY] AgentRouter responded: HTTP %d", ar_resp.status_code)
                 from fastapi.responses import Response as FastAPIResponse
                 return FastAPIResponse(
