@@ -101,8 +101,10 @@ def _stream_generator(session_id: str, chunk_iter, is_realtime: bool, tts_enable
         from config import TTS_VOICE, TTS_RATE
         if not text or not text.strip():
             return
-        voice = "hi-IN-MadhurNeural" if is_hindi_text(text) else TTS_VOICE
-        audio_queue.append((_tts_pool.submit(_generate_tts_sync, text, voice, TTS_RATE), text))
+        is_hi = is_hindi_text(text)
+        voice = "hi-IN-MadhurNeural" if is_hi else TTS_VOICE
+        rate = "+15%" if is_hi else TTS_RATE
+        audio_queue.append((_tts_pool.submit(_generate_tts_sync, text, voice, rate), text))
         last_submit_time = time.perf_counter()
 
     def _drain_ready():

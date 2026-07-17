@@ -1067,9 +1067,11 @@ async def text_to_speech(request: TTSRequest):
 
     async def generate():
         try:
-            voice = "hi-IN-MadhurNeural" if is_hindi_text(text) else TTS_VOICE
+            is_hi = is_hindi_text(text)
+            voice = "hi-IN-MadhurNeural" if is_hi else TTS_VOICE
+            rate = "+15%" if is_hi else TTS_RATE
             cleaned_text = clean_for_tts(text)
-            communicate = edge_tts.Communicate(text=cleaned_text, voice=voice, rate=TTS_RATE, pitch=TTS_PITCH)
+            communicate = edge_tts.Communicate(text=cleaned_text, voice=voice, rate=rate, pitch=TTS_PITCH)
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
                     yield chunk["data"]

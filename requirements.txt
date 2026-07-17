@@ -71,3 +71,9 @@ pytz>=2024.1
 python-telegram-bot>=20.7
 keyboard
 pyautogui
+
+# ── Desktop Client Wake Word ──────────────────────────────────────────────────
+openwakeword>=0.6.0
+sounddevice>=0.4.6
+pystray>=0.19.3
+pygame>=2.5.0
