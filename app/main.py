@@ -66,6 +66,9 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
+from app.services.error_tracker import global_error_tracker
+logging.getLogger().addHandler(global_error_tracker)
+
 logger = logging.getLogger("J.A.R.V.I.S")
 vector_store_service: VectorStoreService = None
 groq_service: GroqService = None
@@ -825,7 +828,15 @@ async def chat(chat_req: ChatRequest, request: Request, x_api_key: Optional[str]
         response_text = request_router.process_request(session_id, chat_req.message)
         chat_service.save_chat_session(session_id)
         logger.info("[API /chat] Done | session_id=%s | response_len=%d", session_id[:12], len(response_text))
-        return ChatResponse(response=response_text, session_id=session_id)
+        
+        metrics = chat_service.last_metrics.get(session_id, {})
+        return ChatResponse(
+            response=response_text, 
+            session_id=session_id,
+            memory_ms=metrics.get("Memory"),
+            llm_first_ms=metrics.get("LLM_first"),
+            llm_total_ms=metrics.get("LLM_total")
+        )
 
     except ValueError as e:
         logger.warning("[API /chat] Invalid session_id: %s", e)
@@ -1067,9 +1078,14 @@ async def text_to_speech(request: TTSRequest):
 
     async def generate():
         try:
-            is_hi = is_hindi_text(text)
-            voice = "hi-IN-MadhurNeural" if is_hi else TTS_VOICE
-            rate = "+15%" if is_hi else TTS_RATE
+            # is_hi = is_hindi_text(text)
+            # voice = "hi-IN-MadhurNeural" if is_hi else TTS_VOICE
+            # rate = "+15%" if is_hi else TTS_RATE
+            
+            # ALWAYS use configured English voice, regardless of input language
+            voice = TTS_VOICE
+            rate = TTS_RATE
+            
             cleaned_text = clean_for_tts(text)
             communicate = edge_tts.Communicate(text=cleaned_text, voice=voice, rate=rate, pitch=TTS_PITCH)
             async for chunk in communicate.stream():
@@ -1088,7 +1104,7 @@ async def text_to_speech(request: TTSRequest):
 @app.post("/stt")
 async def speech_to_text(
     file: "UploadFile",
-    language: str = "en",
+    language: Optional[str] = None,
 ):
     """
     Speech-to-Text endpoint using Groq Whisper.

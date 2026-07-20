@@ -73,6 +73,10 @@ class STTService:
         self,
         audio_bytes: bytes,
         filename: str = "audio.webm",
+        # Language is explicitly left as None (auto-detect).
+        # Do NOT force language='en' on Whisper, since that would cause mistranscription
+        # when the user actually speaks Hindi/Hinglish. Whisper should keep auto-detecting,
+        # and the LLM (not STT) handles responding in English.
         language: Optional[str] = None,
         prompt: Optional[str] = DEFAULT_PROMPT,
     ) -> dict:

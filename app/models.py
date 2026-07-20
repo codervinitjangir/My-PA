@@ -14,6 +14,9 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     session_id: str
+    memory_ms: Optional[int] = None
+    llm_first_ms: Optional[int] = None
+    llm_total_ms: Optional[int] = None
 
 class ChatHistory(BaseModel):
     session_id: str

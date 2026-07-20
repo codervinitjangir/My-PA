@@ -18,18 +18,37 @@ async def generate_briefing(groq_service):
         cal_tool = GoogleCalendarTool()
         calendar_data = cal_tool.execute()
     except Exception as e:
-        calendar_data = f"Error fetching calendar: {e}"
+        error_type = type(e).__name__
+        err_str = str(e).lower()
+        if "network" in err_str or "connection" in err_str:
+            cat = "network_error"
+        elif "refresh" in err_str or "invalid_grant" in err_str or "expired" in err_str:
+            cat = "auth_expired"
+        else:
+            cat = "unknown"
+        calendar_data = f"SYSTEM_ERROR: {cat} - {error_type}: {str(e)}"
         
     try:
         gmail_tool = GmailSummaryTool()
         gmail_data = gmail_tool.execute()
     except Exception as e:
-        gmail_data = f"Error fetching emails: {e}"
+        error_type = type(e).__name__
+        err_str = str(e).lower()
+        if "network" in err_str or "connection" in err_str:
+            cat = "network_error"
+        elif "refresh" in err_str or "invalid_grant" in err_str or "expired" in err_str:
+            cat = "auth_expired"
+        else:
+            cat = "unknown"
+        gmail_data = f"SYSTEM_ERROR: {cat} - {error_type}: {str(e)}"
         
     prompt = (
         "You are JARVIS. Generate a concise morning briefing for Boss. "
         "Include: today's schedule, email summary, and one motivational line. "
         "Keep it under 120 words. Speak as JARVIS from Iron Man.\n\n"
+        "CRITICAL INSTRUCTION: If a tool fails (indicated by SYSTEM_ERROR), report the real reason given to you. "
+        "For example: 'Boss, I couldn't reach Google Calendar this morning — the connection token may have expired.' "
+        "Never invent a technical explanation (like 'browser issues') you were not given. Only report the exact error category provided.\n\n"
         f"Schedule:\n{calendar_data}\n\n"
         f"Emails:\n{gmail_data}"
     )
@@ -88,6 +107,17 @@ def init_scheduler(groq_service):
         replace_existing=True,
     )
     logger.info("[SCHEDULER] Keep-alive ping scheduled every 10 minutes")
+    
+    # Self-diagnostic job every 30 minutes
+    from app.services.self_diagnostic import global_diagnostic_service
+    _scheduler.add_job(
+        global_diagnostic_service.run_diagnostic,
+        "interval",
+        minutes=30,
+        id="self_diagnostic",
+        replace_existing=True,
+    )
+    logger.info("[SCHEDULER] Self-diagnostic job scheduled every 30 minutes")
     
     _scheduler.start()
     logger.info(f"[SCHEDULER] APScheduler started. Daily briefing set for 08:00 {timezone}.")

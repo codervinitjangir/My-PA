@@ -114,51 +114,157 @@ def handle_capture_screen(payload: dict) -> dict:
         logger.error("[SCREEN] Capture failed: %s", e)
         return {"status": "error", "message": str(e)}
 
+def handle_volume_set(payload: dict) -> dict:
+    try:
+        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+        from comtypes import CLSCTX_ALL
+        import ctypes
+        
+        action = payload.get("action", "volume_set")
+        
+        devices = AudioUtilities.GetSpeakers()
+        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        volume = ctypes.cast(interface, ctypes.POINTER(IAudioEndpointVolume))
+        
+        if action == "volume_mute":
+            volume.SetMute(1, None)
+            logger.info("[ACTION] Volume muted")
+            return {"success": True, "message": "Volume muted"}
+        elif action == "volume_unmute":
+            volume.SetMute(0, None)
+            logger.info("[ACTION] Volume unmuted")
+            return {"success": True, "message": "Volume unmuted"}
+        else:
+            level = payload.get("level")
+            if level is None:
+                return {"success": False, "error": "No volume level provided"}
+            level = max(0, min(100, int(level)))
+            volume.SetMasterVolumeLevelScalar(level / 100.0, None)
+            logger.info("[ACTION] Volume set to %s%%", level)
+            return {"success": True, "message": f"Volume set to {level}%"}
+    except Exception as e:
+        logger.error("[ACTION] Volume control failed: %s", e)
+        return {"success": False, "error": str(e)}
+
+def handle_brightness_set(payload: dict) -> dict:
+    try:
+        import screen_brightness_control as sbc
+        level = payload.get("level")
+        if level is None:
+            return {"success": False, "error": "No brightness level provided"}
+        level = max(0, min(100, int(level)))
+        sbc.set_brightness(level)
+        logger.info("[ACTION] Brightness set to %s%%", level)
+        return {"success": True, "message": f"Brightness set to {level}%"}
+    except Exception as e:
+        logger.error("[ACTION] Brightness control failed: %s", e)
+        return {"success": False, "error": f"Brightness control failed: {str(e)}"}
+
+def handle_lock_screen(payload: dict) -> dict:
+    try:
+        import ctypes
+        ctypes.windll.user32.LockWorkStation()
+        logger.info("[ACTION] Screen locked")
+        return {"success": True, "message": "Screen locked"}
+    except Exception as e:
+        logger.error("[ACTION] Screen lock failed: %s", e)
+        return {"success": False, "error": str(e)}
+
+def handle_clipboard_get(payload: dict) -> dict:
+    try:
+        import pyperclip
+        action = payload.get("action", "clipboard_get")
+        if action == "clipboard_set":
+            text = payload.get("text", "")
+            pyperclip.copy(text)
+            logger.info("[ACTION] Clipboard set")
+            return {"success": True, "message": "Clipboard set"}
+        else:
+            text = pyperclip.paste()
+            logger.info("[ACTION] Clipboard read")
+            return {"success": True, "text": text}
+    except Exception as e:
+        logger.error("[ACTION] Clipboard operation failed: %s", e)
+        return {"success": False, "error": str(e)}
+
+def handle_wifi_toggle(payload: dict) -> dict:
+    try:
+        import subprocess
+        state = str(payload.get("state", "")).lower()
+        if state not in ["on", "off"]:
+            return {"success": False, "error": "State must be 'on' or 'off'"}
+        
+        cmd_state = "enabled" if state == "on" else "disabled"
+        result = subprocess.run(
+            ['netsh', 'interface', 'set', 'interface', 'Wi-Fi', cmd_state],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            err = result.stderr.strip() if result.stderr else (result.stdout.strip() if result.stdout else "Permission denied or interface not found")
+            logger.error("[ACTION] WiFi toggle failed: %s", err)
+            return {"success": False, "error": err}
+            
+        logger.info("[ACTION] WiFi turned %s", state)
+        return {"success": True, "message": f"WiFi turned {state}"}
+    except Exception as e:
+        logger.error("[ACTION] WiFi toggle failed: %s", e)
+        return {"success": False, "error": str(e)}
+
 def handle_keyboard_shortcut(payload: dict) -> dict:
     try:
         import keyboard
         shortcut = payload.get("shortcut", "")
         if shortcut:
             keyboard.send(shortcut)
-            logger.info("[ACTION] Keyboard shortcut: %s", shortcut)
-            return {"status": "success"}
-        return {"status": "error", "message": "No shortcut provided"}
-    except ImportError:
-        return {"status": "error", "message": "keyboard package not installed"}
+            logger.info("[ACTION] Keyboard shortcut sent: %s", shortcut)
+            return {"success": True, "message": f"Sent shortcut {shortcut}"}
+        return {"success": False, "error": "No shortcut provided"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error("[ACTION] Keyboard shortcut failed: %s", e)
+        return {"success": False, "error": str(e)}
 
 def handle_type_text(payload: dict) -> dict:
     try:
         import keyboard
         text = payload.get("text", "")
-        if text:
-            keyboard.write(text)
-            logger.info("[ACTION] Typed text: %s", text)
-            return {"status": "success"}
-        return {"status": "error", "message": "No text provided"}
-    except ImportError:
-        return {"status": "error", "message": "keyboard package not installed"}
+        if not text:
+            return {"success": False, "error": "No text provided"}
+            
+        if len(text) > 500:
+            logger.warning("[ACTION] Refused to type text longer than 500 characters (%d chars)", len(text))
+            return {"success": False, "error": "Text too long (max 500 chars)"}
+            
+        keyboard.write(text)
+        logger.info("[ACTION] Typed text: %s", text)
+        return {"success": True, "message": "Text typed successfully"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error("[ACTION] Type text failed: %s", e)
+        return {"success": False, "error": str(e)}
 
 def handle_scroll(payload: dict) -> dict:
     try:
         import pyautogui
         direction = payload.get("direction", "down")
-        amount = payload.get("amount", 300)
+        amount = int(payload.get("amount", 3))
         scroll_val = amount if direction == "up" else -amount
         pyautogui.scroll(scroll_val)
         logger.info("[ACTION] Scrolled %s by %s", direction, amount)
-        return {"status": "success"}
-    except ImportError:
-        return {"status": "error", "message": "pyautogui package not installed"}
+        return {"success": True, "message": f"Scrolled {direction}"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error("[ACTION] Scroll failed: %s", e)
+        return {"success": False, "error": str(e)}
 
 HANDLERS = {
     "open_app":          handle_open_app,
     "capture_screen":    handle_capture_screen,
+    "volume_set":        handle_volume_set,
+    "volume_mute":       lambda p: handle_volume_set({"action": "volume_mute", **p}),
+    "volume_unmute":     lambda p: handle_volume_set({"action": "volume_unmute", **p}),
+    "brightness_set":    handle_brightness_set,
+    "lock_screen":       handle_lock_screen,
+    "clipboard_get":     handle_clipboard_get,
+    "clipboard_set":     lambda p: handle_clipboard_get({"action": "clipboard_set", **p}),
+    "wifi_toggle":       handle_wifi_toggle,
     "keyboard_shortcut": handle_keyboard_shortcut,
     "type_text":         handle_type_text,
     "scroll":            handle_scroll,
@@ -355,19 +461,26 @@ def handle_wake_detection():
     logger.info("[WAKE] Recording...")
     
     with sd.InputStream(samplerate=RATE, channels=CHANNELS, dtype=FORMAT, blocksize=1024) as stream:
+        silence_start_time = None
         for _ in range(int(MAX_SECS * chunks_per_sec)):
             data, overflow = stream.read(1024)
             frames.append(data)
             rms = np.sqrt(np.mean(data.astype(np.float32)**2))
             
             if rms < SILENCE_THRESHOLD:
+                if silent_chunks == 0:
+                    silence_start_time = time.perf_counter()
                 silent_chunks += 1
             else:
                 silent_chunks = 0
+                silence_start_time = None
                 
             if silent_chunks > max_silent_chunks:
                 logger.info("[WAKE] Silence detected, stopping.")
                 break
+
+    vad_time = int((time.perf_counter() - silence_start_time) * 1000) if silence_start_time else 0
+    metrics = {"VAD": vad_time, "silence_start_time": silence_start_time or time.perf_counter()}
 
     wav_io = io.BytesIO()
     with wave.open(wav_io, 'wb') as wf:
@@ -383,7 +496,10 @@ def handle_wake_detection():
     stt_url = f"{RENDER_URL}/stt"
     try:
         files = {'file': ('audio.wav', wav_bytes, 'audio/wav')}
+        stt_start = time.perf_counter()
         r = requests.post(stt_url, headers=HEADERS, files=files, timeout=10)
+        stt_end = time.perf_counter()
+        metrics["STT"] = int((stt_end - stt_start) * 1000)
         r.raise_for_status()
         stt_resp = r.json()
         text = stt_resp.get("text", "").strip()
@@ -405,6 +521,11 @@ def handle_wake_detection():
         r2 = requests.post(chat_url, headers=h, json=chat_req, timeout=30)
         r2.raise_for_status()
         chat_resp = r2.json()
+        
+        metrics["Memory"] = chat_resp.get("memory_ms") or 0
+        metrics["LLM_first"] = chat_resp.get("llm_first_ms") or 0
+        metrics["LLM_total"] = chat_resp.get("llm_total_ms") or 0
+        
         reply_text = chat_resp.get("response", "").strip()
         logger.info("[WAKE] JARVIS replied: %s", reply_text)
         
@@ -425,25 +546,39 @@ def handle_wake_detection():
             if not speak_text and urls:
                 speak_text = "Opening that for you, sir."
             if speak_text:
-                play_tts(speak_text)
+                play_tts(speak_text, metrics)
             
     except Exception as e:
         logger.error("[WAKE] Chat failed: %s", e)
 
-def play_tts(text):
+def play_tts(text, metrics=None):
     tts_url = f"{RENDER_URL}/tts"
     try:
         import pygame
         h = HEADERS.copy()
         h["Content-Type"] = "application/json"
         
+        tts_start = time.perf_counter()
         r = requests.post(tts_url, headers=h, json={"text": text}, stream=True, timeout=20)
         r.raise_for_status()
         
         fd, temp_path = tempfile.mkstemp(suffix=".mp3")
+        first_chunk = True
         with os.fdopen(fd, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
                 if chunk:
+                    if first_chunk and metrics is not None:
+                        tts_first_time = time.perf_counter()
+                        metrics["TTS_first"] = int((tts_first_time - tts_start) * 1000)
+                        
+                        total_time = int((tts_first_time - metrics["silence_start_time"]) * 1000)
+                        metrics["Total"] = total_time
+                        logger.info("[LATENCY] VAD=%sms STT=%sms Memory=%sms LLM_first=%sms LLM_total=%sms TTS_first=%sms Total=%sms",
+                            metrics.get('VAD'), metrics.get('STT'), metrics.get('Memory'), 
+                            metrics.get('LLM_first'), metrics.get('LLM_total'), 
+                            metrics.get('TTS_first'), metrics.get('Total')
+                        )
+                        first_chunk = False
                     f.write(chunk)
                     
         logger.info("[WAKE] Playing TTS response...")

@@ -57,6 +57,15 @@ class MemoryService:
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                # Try to add date_reference column if it doesn't exist
+                try:
+                    cursor.execute("ALTER TABLE knowledge ADD COLUMN date_reference TEXT")
+                except sqlite3.OperationalError:
+                    pass
+                try:
+                    cursor.execute("ALTER TABLE knowledge ADD COLUMN followed_up BOOLEAN DEFAULT 0")
+                except sqlite3.OperationalError:
+                    pass
                 conn.commit()
                 logger.info("[MEMORY] SQLite DB initialized at %s", self.db_path)
         except Exception as e:
@@ -114,6 +123,7 @@ class MemoryService:
             prompt = (
                 "You are JARVIS. Summarise the following recent conversation into EXACTLY "
                 "one concise paragraph (max 150 words). Capture key context, facts, and state. "
+                "Also capture any notable/memorable moments (e.g. funny exchanges, interesting tangents) separately from factual summaries. "
                 "Do NOT include conversational filler.\n\n"
                 f"Conversation:\n{history_text}"
             )
@@ -138,7 +148,7 @@ class MemoryService:
             logger.error("[MEMORY] Summarisation failed: %s", e)
             return None
 
-    def store_knowledge(self, content: str, llm_router, force_update_id: int = None, force_category: str = None) -> str:
+    def store_knowledge(self, content: str, llm_router, force_update_id: int = None, force_category: str = None, date_reference: str = None) -> str:
         try:
             content = redact_text(content)
             
@@ -146,8 +156,8 @@ class MemoryService:
                 with self._get_conn() as conn:
                     cursor = conn.cursor()
                     cursor.execute(
-                        "UPDATE knowledge SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                        (content, force_update_id)
+                        "UPDATE knowledge SET content = ?, updated_at = CURRENT_TIMESTAMP, date_reference = COALESCE(?, date_reference) WHERE id = ?",
+                        (content, date_reference, force_update_id)
                     )
                     conn.commit()
                 cat = force_category or "fact"
@@ -207,15 +217,15 @@ class MemoryService:
                         logger.error("[MEMORY] Contradiction check failed, failing open: %s", e)
                         
                     cursor.execute(
-                        "UPDATE knowledge SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                        (content, best_match_id)
+                        "UPDATE knowledge SET content = ?, updated_at = CURRENT_TIMESTAMP, date_reference = COALESCE(?, date_reference) WHERE id = ?",
+                        (content, date_reference, best_match_id)
                     )
                     conn.commit()
                     return f"Updated existing {category} memory."
                 else:
                     cursor.execute(
-                        "INSERT INTO knowledge (content, category) VALUES (?, ?)",
-                        (content, category)
+                        "INSERT INTO knowledge (content, category, date_reference) VALUES (?, ?, ?)",
+                        (content, category, date_reference)
                     )
                     conn.commit()
                     return f"Stored new {category} memory."
@@ -350,6 +360,78 @@ class MemoryService:
             return ""
 
 
+    def check_usage_patterns(self, llm_router) -> None:
+        try:
+            from jarvis_os.core.usage import get_usage_summary
+            usage = get_usage_summary()
+            
+            # Simple heuristic: check if daily history has a pattern
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            daily = usage.get("daily_history", {}).get(today_str, {})
+            
+            if not daily:
+                return
+                
+            most_used = max(daily, key=daily.get)
+            count = daily[most_used]
+            
+            if count >= 10:
+                with self._get_conn() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM knowledge WHERE category = 'observation' AND date(created_at) = date('now')")
+                    if cursor.fetchone()[0] == 0:
+                        obs = f"User has heavily used the '{most_used}' feature ({count} times) today."
+                        self.store_knowledge(obs, llm_router, force_category="observation")
+        except Exception as e:
+            logger.error("[MEMORY] Pattern checking failed: %s", e)
+
+    def get_todays_relevant_memories(self) -> List[str]:
+        try:
+            today_mmdd = datetime.now().strftime("%m-%d")
+            tomorrow_mmdd = (datetime.now() + timedelta(days=1)).strftime("%m-%d")
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            
+            results = []
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT content FROM knowledge WHERE date_reference IN (?, ?, 'today', 'tomorrow') AND category != 'observation'",
+                    (today_mmdd, tomorrow_mmdd)
+                )
+                rows = cursor.fetchall()
+                for row in rows:
+                    results.append(f"[CONTEXTUAL AWARENESS] Note: {row[0]}. If natural, you may bring this up conversationally, but only if it fits — do not force it.")
+
+                # Callback Threading
+                cursor.execute(
+                    "SELECT id, content FROM knowledge WHERE date_reference IN (?, ?, 'today', 'yesterday') AND followed_up = 0",
+                    (today_str, yesterday_str)
+                )
+                rows = cursor.fetchall()
+                keywords = ['tomorrow', 'nervous', 'worried', 'hoping', 'interview', 'demo', 'deadline', 'exam']
+                
+                for row_id, content in rows:
+                    if any(kw in content.lower() for kw in keywords):
+                        results.append(f"[FOLLOW-UP OPPORTUNITY] User mentioned: {content}. If it feels natural in conversation, you may ask how it went — but only once, and only if not already asked.")
+                        cursor.execute("UPDATE knowledge SET followed_up = 1 WHERE id = ?", (row_id,))
+                        conn.commit()
+
+                # Pattern Noticing
+                cursor.execute(
+                    "SELECT id, content FROM knowledge WHERE category = 'observation' AND date(created_at) = date('now') AND followed_up = 0 LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row:
+                    results.append(f"[OBSERVATION] {row[1]}. You may mention this casually if it fits.")
+                    cursor.execute("UPDATE knowledge SET followed_up = 1 WHERE id = ?", (row[0],))
+                    conn.commit()
+
+            return results
+        except Exception as e:
+            logger.error("[MEMORY] Failed to get today's memories: %s", e)
+            return []
+
     def extract_passive_knowledge(self, message: str, llm_router) -> None:
         """Runs in background: extracts facts passively without user asking 'remember'."""
         if len(message) < 10 or len(message) > 500:
@@ -357,8 +439,13 @@ class MemoryService:
             
         prompt = (
             "Does the following user message state a clear, permanent personal fact, preference, "
-            "or procedural rule about the user? (Ignore casual chat, opinions on current events, or temporary statuses).\n"
-            "If YES, output ONLY the extracted fact as a clean, standalone sentence (e.g., 'The user is allergic to peanuts.').\n"
+            "procedural rule, or a date-related life event (e.g., birthday, anniversary, important calendar date, deadline) about the user? "
+            "(Ignore casual chat, opinions on current events, or temporary statuses).\n"
+            "If YES, output the extracted fact as a clean, standalone sentence.\n"
+            "If the fact contains a date or time reference (like 'July 25', 'tomorrow', 'next Monday'), "
+            "also output a '|' followed by a normalized 'MM-DD' or 'YYYY-MM-DD' representation of the date, or 'tomorrow'.\n"
+            "Example output 1: The user is allergic to peanuts.\n"
+            "Example output 2: The user's birthday is on July 25.|07-25\n"
             "If NO, output exactly 'null'.\n\n"
             f"Message: {message}"
         )
@@ -366,9 +453,15 @@ class MemoryService:
         try:
             resp = llm_router.get_response(prompt).strip()
             if resp.lower() != 'null' and len(resp) > 5:
-                # It extracted something! Store it.
-                logger.info(f"[MEMORY] Passive Fact Extracted: {resp}")
-                self.store_knowledge(resp, llm_router)
+                # Check for date reference
+                date_ref = None
+                if '|' in resp:
+                    fact, date_ref = resp.split('|', 1)
+                    resp = fact.strip()
+                    date_ref = date_ref.strip()
+                
+                logger.info(f"[MEMORY] Passive Fact Extracted: {resp} (Date: {date_ref})")
+                self.store_knowledge(resp, llm_router, date_reference=date_ref)
         except Exception as e:
             logger.debug(f"[MEMORY] Passive extraction failed silently: {e}")
 

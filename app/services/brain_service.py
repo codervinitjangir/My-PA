@@ -7,7 +7,7 @@ from config import GROQ_API_KEYS, INTENT_CLASSIFY_MODEL
 logger = logging.getLogger("J.A.R.V.I.S")
 
 CategoryType = Literal["general", "realtime", "camera", "task"]
-ALL_CATEGORIES: List[str] = ["general", "realtime", "camera", "task", "mixed"]
+ALL_CATEGORIES: List[str] = ["general", "casual_chat", "realtime", "camera", "task", "mixed"]
 
 TaskType = Literal[
     "open", "play", "generate_image", "content",
@@ -51,13 +51,16 @@ Examples: "Who is Elon Musk?" / "Latest news" / "What's the weather?" / "Current
 - Questions about anything that changes over time or needs up-to-date info → realtime
 - When unsure if your knowledge is current enough → realtime (PREFER realtime over general for factual questions)
 
-**general** — Chat from knowledge only. No web search needed. ONLY for: greetings, casual chat, opinions, advice, coding help, math, static facts, personal questions about the user's stored data.
-Examples: "Hello" / "Tell me a joke" / "What is 2+2?" / "What is the capital of France?" / "How do I improve my coding?" / "Do you know my website?" / "What's the link of my website?" / "Thanks" / "You're funny" / "How are you?"
-- Greetings, casual chat, opinions, personal advice → general
+**general** — Chat from knowledge only. No web search needed. ONLY for: opinions, advice, coding help, math, static facts, personal questions about the user's stored data.
+Examples: "What is 2+2?" / "What is the capital of France?" / "How do I improve my coding?" / "Do you know my website?" / "What's the link of my website?" 
 - Questions answerable from knowledge or stored user data → general
 - "Do you know my X?" / "What's my X?" → general (answer from stored data, NOT web search)
 - Static, unchanging facts (math, geography, definitions) → general
 - Fictional, hypothetical, or illogical requests (e.g., "open a portal to Asgard", "run diagnostic on mark 42") → general
+
+**casual_chat** — Friendly, conversational banter or simple greetings without any task, factual question, or need for search.
+Examples: "Hello" / "Tell me a joke" / "Thanks" / "You're funny" / "How are you?" / "What's up?"
+- Greetings, casual chat, small talk → casual_chat
 
 === CONTEXTUAL INTELLIGENCE ===
 CRITICAL: You MUST read the conversation history to understand context.
@@ -89,7 +92,7 @@ CRITICAL: You MUST read the conversation history to understand context.
   1. "intent": string (e.g. CHAT, SEARCH, CODE, GIT, CALCULATE, CALENDAR, EMAIL, FILE_OPS, SYSTEM_OPS, MEDIA_PLAY, MEDIA_GEN, VISION)
   2. "confidence": float between 0.0 and 1.0
   3. "reasoning_level": string ("fast" for simple queries, "deep" for complex queries)
-  4. "legacy_route": string (MUST be one of: general, realtime, camera, task, mixed)
+  4. "legacy_route": string (MUST be one of: general, casual_chat, realtime, camera, task, mixed)
 - Nothing else. No explanation. Just the JSON object.
 - Tasks (open, play, generate, write, search, webcam) ALONE → task
 - Question + task in SAME message → mixed
@@ -237,7 +240,7 @@ class BrainService:
         return (category, method, elapsed_ms, parsed_json)
 
     _TASK_FEW_SHOTS = [
-        ("how are you?", "general how are you?"),
+        ("how are you?", "casual_chat how are you?"),
         ("open chrome and tell me about mahatma gandhi.", "open chrome, general tell me about mahatma gandhi"),
         ("open chrome and firefox", "open chrome, open firefox"),
         ("play Dhurandhar title track on YouTube", "play Dhurandhar title track"),
@@ -590,7 +593,7 @@ Classify. Output EXACTLY ONE category name."""
             "open_webcam", "close_webcam",
             "check_calendar", "check_emails",
             "content", "open", "close", "play",
-            "general", "realtime",
+            "general", "casual_chat", "realtime",
         ]
 
         NORMALIZE = {
@@ -612,7 +615,7 @@ Classify. Output EXACTLY ONE category name."""
                     query = part[len(prefix):].strip().rstrip(".!?")
                     task_type = NORMALIZE.get(prefix, prefix)
 
-                    if task_type in ("general", "realtime"):
+                    if task_type in ("general", "casual_chat", "realtime"):
                         continue
                     decisions.append((task_type, query))
                     matched = True
@@ -624,7 +627,7 @@ Classify. Output EXACTLY ONE category name."""
                         idx = part_lower.index(prefix)
                         query = part[idx + len(prefix):].strip().rstrip(".!?")
                         task_type = NORMALIZE.get(prefix, prefix)
-                        if task_type in ("general", "realtime"):
+                        if task_type in ("general", "casual_chat", "realtime"):
                             continue
                         decisions.append((task_type, query))
                         matched = True
@@ -643,7 +646,7 @@ Classify. Output EXACTLY ONE category name."""
 
         if m in ("hello", "hi", "hey", "good morning", "good evening", "good afternoon",
                  "how are you", "what's up", "thanks", "thank you", "bye", "goodbye"):
-            return "general"
+            return "casual_chat"
 
         # Email / mail check — must be before camera block to prevent misrouting
         # (e.g. "check my last mail" was hitting the camera detector via "check")

@@ -50,6 +50,7 @@ class ChatService:
         self.pending_actions = {}
         self.current_preset = 'default'
         self.session_presets: Dict[str, str] = {}
+        self.last_metrics: Dict[str, Dict[str, int]] = {}
         self._save_lock = Lock()
 
     def set_preset(self, preset_name: str, session_id: str = None):
@@ -241,6 +242,14 @@ class ChatService:
     def add_message(self, session_id: str, role: str, content: str):
         if session_id not in self.sessions:
             self.sessions[session_id] = []
+            
+        if len(self.sessions[session_id]) == 0 and role == "user" and self.memory_service:
+            self.memory_service.check_usage_patterns(self.groq_service)
+            relevant_memories = self.memory_service.get_todays_relevant_memories()
+            if relevant_memories:
+                facts = "\n".join(relevant_memories)
+                context_msg = f"{facts}\nIf natural, you may bring this up conversationally, but only if it fits — do not force it into every response."
+                self.sessions[session_id].append(ChatMessage(role="system", content=context_msg))
         
         self.sessions[session_id].append(
             ChatMessage(
@@ -278,6 +287,8 @@ class ChatService:
         return history
 
     def process_message(self, session_id: str, user_message: str) -> str:
+        self.last_metrics[session_id] = {}
+        
         logger.info(
             "[GENERAL] Session: %s | User: %.200s", 
             session_id[:12], 
@@ -286,12 +297,19 @@ class ChatService:
         
         self.add_message(session_id, "user", user_message)
         chat_history = self.format_history_for_llm(session_id, exclude_last=True)
+        
+        # Start Memory Timing
+        mem_start = time.perf_counter()
+        
         mem_prefix = ""
         if self.memory_service:
             recent = [str(m.content) for m in self.sessions.get(session_id, [])[:-2][-3:]]
             mem_prefix = self.memory_service.build_memory_context(session_id, user_message, recent)
         enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
         enriched_question = self._apply_preset_to_question(session_id, enriched_question)
+        
+        mem_end = time.perf_counter()
+        self.last_metrics[session_id]["Memory"] = int((mem_end - mem_start) * 1000)
         
         logger.info(
             "[GENERAL] History pairs sent to LLM: %d", 
@@ -300,11 +318,27 @@ class ChatService:
 
         _, chat_idx = get_next_key_pair(len(GROQ_API_KEYS), need_brain=False)
         
-        response = self.groq_service.get_response(
+        # Start LLM Timing
+        llm_start = time.perf_counter()
+        response_text = ""
+        first_token = False
+        
+        for chunk in self.groq_service.stream_response(
             question=enriched_question, 
             chat_history=chat_history, 
             key_start_index=chat_idx
-        )
+        ):
+            if isinstance(chunk, str):
+                if not first_token:
+                    llm_first = time.perf_counter()
+                    self.last_metrics[session_id]["LLM_first"] = int((llm_first - llm_start) * 1000)
+                    first_token = True
+                response_text += chunk
+            
+        llm_end = time.perf_counter()
+        self.last_metrics[session_id]["LLM_total"] = int((llm_end - llm_start) * 1000)
+        
+        response = response_text
 
         self.add_message(session_id, "assistant", response)
         
@@ -864,7 +898,7 @@ class ChatService:
                     "realtime", [], "Brain timeout, defaulting to realtime", 0, {}
                 )
 
-            if query_type == "general":
+            if query_type in ("general", "casual_chat"):
                 formatted_results, search_payload = "", None
                 # We do not wait for future_search here.
 
@@ -1088,9 +1122,13 @@ class ChatService:
             relevant_tools = list(ToolRegistry.get_relevant_tools(enriched_jarvis_question, top_k=5).values())
             tools_str = "\nAvailable Tools (You can instruct the user to run them if needed):\n" + "\n".join([f"- {t.name}: {t.description}" for t in relevant_tools]) if relevant_tools else ""
             
-            if query_type == "general":
+            if query_type in ("general", "casual_chat"):
+                question_to_send = enriched_jarvis_question
+                if query_type == "casual_chat":
+                    question_to_send = f"[CASUAL MODE] This is casual conversation, not a work task. Respond more like texting a friend — shorter, relaxed, occasional humor where it fits. No need to over-explain or offer additional help unless asked.\n\n{question_to_send}"
+                    
                 stream = self.groq_service.stream_response(
-                    question=enriched_jarvis_question, 
+                    question=question_to_send, 
                     chat_history=chat_history, 
                     key_start_index=chat_idx,
                     tools_str=tools_str,

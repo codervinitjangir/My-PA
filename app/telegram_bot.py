@@ -85,6 +85,20 @@ async def forget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         res = memory_service.forget_knowledge(keyword)
     await update.message.reply_text(res)
 
+@owner_only
+async def apply_fix_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /apply_fix <fix_id>")
+        return
+    
+    fix_id = context.args[0]
+    from app.services.self_diagnostic import global_diagnostic_service
+    
+    # Run the application (which includes I/O and git operations) in a thread
+    import asyncio
+    result = await asyncio.to_thread(global_diagnostic_service.apply_fix, fix_id)
+    await update.message.reply_text(result)
+
 import asyncio
 import webbrowser
 import tempfile
@@ -513,6 +527,7 @@ async def start_telegram_bot(chat_service):
     application.add_handler(CommandHandler("memory", memory_command))
     application.add_handler(CommandHandler("forget", forget_command))
     application.add_handler(CommandHandler("mode", mode_command))
+    application.add_handler(CommandHandler("apply_fix", apply_fix_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     application.add_handler(MessageHandler(filters.PHOTO, photo_message))
     

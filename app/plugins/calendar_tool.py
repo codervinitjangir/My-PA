@@ -30,11 +30,17 @@ def get_google_credentials():
     creds = None
     if os.path.exists(TOKEN_FILE):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        
+    import logging
+    logger = logging.getLogger("J.A.R.V.I.S")
+    if creds:
+        logger.info(f"Google Token exists. Valid: {creds.valid}, Expired: {creds.expired}, Expiry: {creds.expiry}, Has Refresh Token: {bool(creds.refresh_token)}")
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
             except Exception as e:
+                logger.error(f"Token refresh failed: {e}", exc_info=True)
                 print(f"Token refresh failed: {e}. Re-authenticating...")
                 if os.path.exists(TOKEN_FILE):
                     os.remove(TOKEN_FILE)
@@ -128,4 +134,7 @@ class GoogleCalendarTool(BaseTool):
             return "\n".join(output)
             
         except Exception as e:
-            return f"Error fetching calendar: {str(e)}"
+            import logging
+            logger = logging.getLogger("J.A.R.V.I.S")
+            logger.error("calendar_tool execute failed", exc_info=True)
+            raise e

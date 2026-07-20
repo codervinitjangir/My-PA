@@ -69,8 +69,14 @@ pytz>=2024.1
 
 # ── Telegram Bot ──────────────────────────────────────────────────────────────
 python-telegram-bot>=20.7
-keyboard
-pyautogui
+
+# ── Local Desktop Controls ────────────────────────────────────────────────────
+pycaw>=20230407
+screen-brightness-control>=0.16.0
+pyperclip>=1.8.2
+keyboard>=0.13.5
+pyautogui>=0.9.54
+comtypes>=1.2.0
 
 # ── Desktop Client Wake Word ──────────────────────────────────────────────────
 openwakeword>=0.6.0

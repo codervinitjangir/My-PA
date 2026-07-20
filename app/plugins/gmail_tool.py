@@ -84,7 +84,10 @@ class GmailSummaryTool(BaseTool):
             return "\n".join(output)
             
         except Exception as e:
-            return f"Error fetching emails: {str(e)}"
+            import logging
+            logger = logging.getLogger("J.A.R.V.I.S")
+            logger.error("gmail_tool execute failed", exc_info=True)
+            raise e
 
     def get_latest_attachment(self, file_type: str = "pdf") -> dict:
         """
