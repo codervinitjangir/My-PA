@@ -23,6 +23,10 @@ if defined RENDER_URL_VAL (
         echo [INFO] Your laptop will bridge desktop commands to Render.
         start "JARVIS Laptop Client" %PYTHON_EXE% -m jarvis_desktop.laptop_client
         echo.
+        echo [INFO] Laptop Client mode active. Backend will not start locally.
+        echo [INFO] Close this window when you are done.
+        pause
+        exit /b
     )
 )
 
