@@ -352,7 +352,7 @@ app.add_middleware(
 
 # ── Security: Bearer token auth (only active when JARVIS_API_TOKEN is set) ────
 _JARVIS_TOKEN = os.getenv("JARVIS_API_TOKEN", "").strip()
-_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config", "/telegram/webhook"}
+_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config", "/telegram/webhook", "/laptop/ws"}
 _AUTH_PUBLIC_PREFIXES = ("/app", "/proxy/")  # /proxy/ uses X-Proxy-Secret auth instead
 
 class AuthMiddleware(BaseHTTPMiddleware):
