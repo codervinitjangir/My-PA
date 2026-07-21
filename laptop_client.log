@@ -219,3 +219,44 @@
 11:59:04 | INFO     | [LATENCY] VAD=1484ms STT=508ms Memory=0ms LLM_first=4918ms LLM_total=4981ms TTS_first=1188ms Total=8273ms
 11:59:04 | INFO     | [NETWORK] stt_roundtrip=508ms chat_roundtrip=5089ms tts_first_byte=1188ms | unaccounted_gap=4ms
 11:59:05 | INFO     | [WAKE] Playing TTS response...
+12:05:00 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+12:05:01 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+12:05:01 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+12:05:02 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+12:05:03 | INFO     | [WAKE] Input stream started.
+12:05:07 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+12:05:09 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+12:05:19 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+12:05:21 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+12:05:41 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+12:05:41 | INFO     | [WS] Connected to JARVIS server!
+12:06:02 | INFO     | [WAKE] Partial match score: 0.16
+12:06:08 | INFO     | [WAKE] Partial match score: 0.16
+12:06:08 | INFO     | [WAKE] Partial match score: 0.39
+12:06:26 | INFO     | [WAKE] Partial match score: 0.13
+12:06:26 | INFO     | [WAKE] Partial match score: 0.22
+12:06:27 | INFO     | [WAKE] Partial match score: 0.14
+12:06:27 | INFO     | [WAKE] Partial match score: 0.25
+12:06:40 | INFO     | [WAKE] Partial match score: 0.20
+12:06:40 | INFO     | [WAKE] Partial match score: 0.49
+12:06:40 | INFO     | [WAKE] Wake word detected! (Score: 0.49)
+12:06:40 | INFO     | [WAKE] Recording...
+12:06:45 | INFO     | [WAKE] Silence detected, stopping.
+12:06:45 | INFO     | [AUDIO] Uploading WAV: size=147500 bytes (~4.6s of audio, uncompressed PCM)
+12:06:45 | INFO     | HTTP Request: POST http://127.0.0.1:8000/stt "HTTP/1.1 200 OK"
+12:06:45 | INFO     | [NETWORK] STT: rtt=678ms | server_processing=667ms | network_overhead=11ms
+12:06:45 | INFO     | [WAKE] Recognized: How are you and what are you doing and when are you doing
+12:06:47 | INFO     | HTTP Request: POST http://127.0.0.1:8000/chat "HTTP/1.1 200 OK"
+12:06:47 | INFO     | [NETWORK] Chat: rtt=1401ms | server_llm=1360ms | network+overhead=41ms
+12:06:47 | INFO     | [WAKE] JARVIS replied: I'm functioning normally, Boss. I'm currently ready to assist you at 12:06 PM on Tuesday, July 21, 2026, and I've been keeping track of your activities, including your preparations for the interview tomorrow.
+12:06:47 | INFO     | HTTP Request: POST http://127.0.0.1:8000/tts "HTTP/1.1 200 OK"
+12:06:48 | INFO     | [LATENCY] VAD=1484ms STT=678ms Memory=0ms LLM_first=1277ms LLM_total=1360ms TTS_first=1185ms Total=4846ms
+12:06:48 | INFO     | [NETWORK] stt_roundtrip=678ms chat_roundtrip=1401ms tts_first_byte=1185ms | unaccounted_gap=98ms
+12:06:49 | INFO     | [WAKE] Playing TTS response...
+12:07:05 | INFO     | [WAKE] Partial match score: 0.35
+12:07:05 | INFO     | [WAKE] Partial match score: 0.19
+12:07:36 | WARNING  | [WS] Closed with error: no close frame received or sent
+12:07:41 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+12:07:43 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+12:07:53 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+12:07:55 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
