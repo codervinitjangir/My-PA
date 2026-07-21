@@ -155,7 +155,7 @@ class LLMRouter:
         from config import REALTIME_CHAT_ADDENDUM, GENERAL_CHAT_ADDENDUM
         return REALTIME_CHAT_ADDENDUM if use_search else GENERAL_CHAT_ADDENDUM
 
-    def _try_stream(self, gen_fn) -> Tuple[Optional[Iterator], bool]:
+    def _try_stream(self, gen_fn, provider_name: str = "unknown", prompt_size: int = 0) -> Tuple[Optional[Iterator], bool]:
         """
         Attempts to prime a generator by fetching the first chunk.
         Returns (iterator_with_first_chunk_pre-pended, success_flag).
@@ -165,6 +165,9 @@ class LLMRouter:
         try:
             gen = gen_fn()
             first = next(gen)            # probe — raises immediately on connection failure
+            logger.info("[LLM] Tier used: %s", provider_name)
+            if prompt_size > 0:
+                logger.info("[LLM] System prompt size: %d characters / ~%d estimated tokens", prompt_size, prompt_size // 4)
             return itertools.chain([first], gen), True
         except StopIteration:
             return iter([]), True        # empty but valid stream
@@ -198,6 +201,14 @@ class LLMRouter:
                 )
             except Exception as e:
                 logger.warning("[LLM] Search pre-fetch failed: %s", e)
+                
+        # Estimate prompt size
+        from config import JARVIS_SYSTEM_PROMPT
+        base = len(JARVIS_SYSTEM_PROMPT)
+        hist = sum(len(h) + len(a) for h, a in chat_history) if chat_history else 0
+        search = len(formatted_results) if formatted_results else 0
+        tools = len(kwargs.get("tools_str", ""))
+        prompt_size = base + hist + search + tools + len(question) + 300
 
         def _gemini_stream():
             if formatted_results:
@@ -234,18 +245,20 @@ class LLMRouter:
         # Route complex queries directly to Tier 3
         if is_complex(question) and self.agent_router:
             self._log_routing(3, DEEP_MODEL, "complex query — stream")
-            stream, ok = self._try_stream(_claude_stream)
+            stream, ok = self._try_stream(_claude_stream, "agentrouter (claude)", prompt_size)
             if ok:
                 yield from stream
                 return
             logger.warning("[LLM] Claude Opus stream failed → Groq (T4)")
+            logger.info("[LLM] Tier used: groq")
+            logger.info("[LLM] System prompt size: %d characters / ~%d estimated tokens", prompt_size, prompt_size // 4)
             yield from _groq_stream()
             return
 
         # Tier 1 — Gemini
         if self.gemini:
             self._log_routing(1, "gemini-2.0-flash", "primary stream")
-            stream, ok = self._try_stream(_gemini_stream)
+            stream, ok = self._try_stream(_gemini_stream, "gemini", prompt_size)
             if ok:
                 yield from stream
                 return
@@ -254,7 +267,7 @@ class LLMRouter:
         # Tier 2 — GPT-5.5
         if self.agent_router:
             self._log_routing(2, GPT_FAST_MODEL, "Gemini fallback stream")
-            stream, ok = self._try_stream(_gpt_stream)
+            stream, ok = self._try_stream(_gpt_stream, "agentrouter (gpt-5.5)", prompt_size)
             if ok:
                 yield from stream
                 return
@@ -262,7 +275,7 @@ class LLMRouter:
 
             # Tier 3 — Claude Opus
             self._log_routing(3, DEEP_MODEL, "GPT-5.5 fallback stream")
-            stream, ok = self._try_stream(_claude_stream)
+            stream, ok = self._try_stream(_claude_stream, "agentrouter (claude)", prompt_size)
             if ok:
                 yield from stream
                 return
@@ -270,6 +283,8 @@ class LLMRouter:
 
         # Tier 4 — Groq
         self._log_routing(4, "groq-llama-70b", "emergency stream fallback")
+        logger.info("[LLM] Tier used: groq")
+        logger.info("[LLM] System prompt size: %d characters / ~%d estimated tokens", prompt_size, prompt_size // 4)
         yield from _groq_stream()
 
     # ── Streaming: stream_response_with_prefetched ──────────────────────────────

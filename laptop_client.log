@@ -44,3 +44,178 @@
 11:20:06 | INFO     | [WAKE] Partial match score: 0.28
 11:20:21 | INFO     | [WAKE] Partial match score: 0.10
 11:20:22 | INFO     | [WAKE] Partial match score: 0.11
+11:29:11 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:29:13 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+11:29:14 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+11:29:15 | INFO     | [WAKE] Input stream started.
+11:29:15 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:29:20 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:29:24 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:29:34 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:29:38 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:29:58 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:30:02 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:30:42 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:30:44 | INFO     | [WS] Connected to JARVIS server!
+11:31:04 | INFO     | [WAKE] Partial match score: 0.10
+11:31:12 | INFO     | [WAKE] Partial match score: 0.13
+11:31:12 | INFO     | [WAKE] Partial match score: 0.11
+11:31:14 | INFO     | [WAKE] Partial match score: 0.13
+11:31:14 | INFO     | [WAKE] Partial match score: 0.36
+11:31:14 | INFO     | [WAKE] Partial match score: 0.35
+11:31:14 | INFO     | [WAKE] Partial match score: 0.35
+11:31:14 | INFO     | [WAKE] Partial match score: 0.33
+11:31:14 | INFO     | [WAKE] Partial match score: 0.48
+11:31:14 | INFO     | [WAKE] Wake word detected! (Score: 0.48)
+11:31:14 | INFO     | [WAKE] Recording...
+11:31:19 | INFO     | [WAKE] Silence detected, stopping.
+11:31:19 | INFO     | [AUDIO] Uploading WAV: size=141356 bytes (~4.4s of audio, uncompressed PCM)
+11:31:22 | INFO     | [NETWORK] STT: rtt=3298ms | server_processing=1202ms | network_overhead=2096ms
+11:31:22 | INFO     | [WAKE] Recognized: How are you and what are you doing
+11:31:26 | INFO     | [NETWORK] Chat: rtt=4043ms | server_llm=1806ms | network+overhead=2237ms
+11:31:26 | INFO     | [WAKE] JARVIS replied: I'm functioning normally, Boss. I'm currently ready to assist you, and I've been keeping track of our conversations and your activities, including the multiple web searches you've done today, as you prepare for your interview tomorrow.
+11:31:30 | INFO     | [LATENCY] VAD=1483ms STT=3298ms Memory=1ms LLM_first=1546ms LLM_total=1806ms TTS_first=3904ms Total=12926ms
+11:31:30 | INFO     | [NETWORK] stt_roundtrip=3298ms chat_roundtrip=4043ms tts_first_byte=3904ms | unaccounted_gap=198ms
+11:31:31 | INFO     | [WAKE] Playing TTS response...
+11:31:46 | INFO     | [WAKE] Partial match score: 0.19
+11:38:57 | INFO     | [WAKE] Partial match score: 0.17
+11:39:18 | INFO     | [WAKE] Partial match score: 0.46
+11:39:18 | INFO     | [WAKE] Wake word detected! (Score: 0.46)
+11:39:18 | INFO     | [WAKE] Recording...
+11:39:19 | INFO     | [WAKE] Silence detected, stopping.
+11:39:19 | INFO     | [AUDIO] Uploading WAV: size=49196 bytes (~1.5s of audio, uncompressed PCM)
+11:39:22 | INFO     | [NETWORK] STT: rtt=2557ms | server_processing=505ms | network_overhead=2052ms
+11:39:22 | INFO     | [WAKE] Recognized: Thank you
+11:39:26 | INFO     | [NETWORK] Chat: rtt=4360ms | server_llm=2216ms | network+overhead=2144ms
+11:39:26 | INFO     | [WAKE] JARVIS replied: You're welcome, Boss. I hope the web searches were helpful in preparing for your interview tomorrow.
+11:39:30 | INFO     | [LATENCY] VAD=1483ms STT=2557ms Memory=7ms LLM_first=2153ms LLM_total=2216ms TTS_first=3476ms Total=11891ms
+11:39:30 | INFO     | [NETWORK] stt_roundtrip=2557ms chat_roundtrip=4360ms tts_first_byte=3476ms | unaccounted_gap=15ms
+11:39:31 | INFO     | [WAKE] Playing TTS response...
+11:39:38 | INFO     | [WAKE] Partial match score: 0.20
+11:51:57 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:52:01 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:52:02 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+11:52:02 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+11:52:03 | INFO     | [WAKE] Input stream started.
+11:52:06 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:52:10 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:52:20 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:52:24 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:52:44 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:52:48 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:53:28 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:53:30 | INFO     | [WS] Connected to JARVIS server!
+11:53:41 | INFO     | [WAKE] Partial match score: 0.33
+11:53:41 | INFO     | [WAKE] Partial match score: 0.33
+11:54:21 | INFO     | [WAKE] Partial match score: 0.24
+11:54:21 | INFO     | [WAKE] Partial match score: 0.23
+11:54:21 | INFO     | [WAKE] Partial match score: 0.36
+11:54:21 | INFO     | [WAKE] Partial match score: 0.47
+11:54:21 | INFO     | [WAKE] Wake word detected! (Score: 0.47)
+11:54:21 | INFO     | [WAKE] Recording...
+11:54:26 | INFO     | [WAKE] Silence detected, stopping.
+11:54:26 | INFO     | [AUDIO] Uploading WAV: size=137260 bytes (~4.3s of audio, uncompressed PCM)
+11:54:28 | INFO     | HTTP Request: POST http://localhost:8000/stt "HTTP/1.1 200 OK"
+11:54:28 | INFO     | [NETWORK] STT: rtt=2675ms | server_processing=618ms | network_overhead=2057ms
+11:54:28 | INFO     | [WAKE] Recognized: How are you and what are you doing
+11:54:29 | INFO     | HTTP Request: POST http://localhost:8000/chat "HTTP/1.1 200 OK"
+11:54:29 | INFO     | [NETWORK] Chat: rtt=1061ms | server_llm=1009ms | network+overhead=52ms
+11:54:29 | INFO     | [WAKE] JARVIS replied: I'm functioning normally, Boss. I'm currently ready to assist you and help with any last-minute preparations for your interview tomorrow.
+11:54:30 | INFO     | HTTP Request: POST http://localhost:8000/tts "HTTP/1.1 200 OK"
+11:54:31 | INFO     | [LATENCY] VAD=1477ms STT=2675ms Memory=3ms LLM_first=956ms LLM_total=1009ms TTS_first=1298ms Total=6631ms
+11:54:31 | INFO     | [NETWORK] stt_roundtrip=2675ms chat_roundtrip=1061ms tts_first_byte=1298ms | unaccounted_gap=120ms
+11:54:32 | INFO     | [WAKE] Playing TTS response...
+11:54:41 | INFO     | [WAKE] Partial match score: 0.39
+11:54:41 | INFO     | [WAKE] Partial match score: 0.31
+11:54:41 | INFO     | [WAKE] Partial match score: 0.22
+11:56:34 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:56:35 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+11:56:35 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+11:56:36 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:56:36 | INFO     | [WAKE] Input stream started.
+11:56:41 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:56:43 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:56:53 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:56:55 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:57:09 | INFO     | [WAKE] Partial match score: 0.24
+11:57:09 | INFO     | [WAKE] Partial match score: 0.32
+11:57:10 | INFO     | [WAKE] Partial match score: 0.24
+11:57:15 | INFO     | [WS] Connecting to ws://127.0.0.1:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:57:15 | INFO     | [WS] Connected to JARVIS server!
+11:57:40 | INFO     | [WAKE] Partial match score: 0.14
+11:57:40 | INFO     | [WAKE] Partial match score: 0.30
+11:57:40 | INFO     | [WAKE] Partial match score: 0.20
+11:57:40 | INFO     | [WAKE] Partial match score: 0.12
+11:57:40 | INFO     | [WAKE] Partial match score: 0.12
+11:57:40 | INFO     | [WAKE] Partial match score: 0.21
+11:57:45 | INFO     | [WAKE] Partial match score: 0.17
+11:57:45 | INFO     | [WAKE] Partial match score: 0.33
+11:57:45 | INFO     | [WAKE] Partial match score: 0.34
+11:57:45 | INFO     | [WAKE] Partial match score: 0.23
+11:57:45 | INFO     | [WAKE] Partial match score: 0.30
+11:57:47 | INFO     | [WAKE] Partial match score: 0.11
+11:57:47 | INFO     | [WAKE] Partial match score: 0.12
+11:57:47 | INFO     | [WAKE] Partial match score: 0.12
+11:57:47 | INFO     | [WAKE] Partial match score: 0.27
+11:57:47 | INFO     | [WAKE] Partial match score: 0.16
+11:57:49 | INFO     | [WAKE] Partial match score: 0.30
+11:57:50 | INFO     | [WAKE] Partial match score: 0.43
+11:57:50 | INFO     | [WAKE] Wake word detected! (Score: 0.43)
+11:57:50 | INFO     | [WAKE] Recording...
+11:57:53 | INFO     | [WAKE] Silence detected, stopping.
+11:57:53 | INFO     | [AUDIO] Uploading WAV: size=122924 bytes (~3.8s of audio, uncompressed PCM)
+11:57:54 | INFO     | HTTP Request: POST http://127.0.0.1:8000/stt "HTTP/1.1 200 OK"
+11:57:54 | INFO     | [NETWORK] STT: rtt=743ms | server_processing=713ms | network_overhead=30ms
+11:57:54 | INFO     | [WAKE] Recognized: How are you and what are you doing
+11:57:57 | INFO     | HTTP Request: POST http://127.0.0.1:8000/chat "HTTP/1.1 200 OK"
+11:57:57 | INFO     | [NETWORK] Chat: rtt=2385ms | server_llm=2249ms | network+overhead=136ms
+11:57:57 | INFO     | [WAKE] JARVIS replied: I'm functioning normally, Boss. I'm currently ready to assist you, and I've been keeping track of your activities, including the multiple web searches you've done today as you prepare for your interview tomorrow.
+11:57:57 | INFO     | HTTP Request: POST http://127.0.0.1:8000/tts "HTTP/1.1 200 OK"
+11:57:58 | INFO     | [LATENCY] VAD=1486ms STT=743ms Memory=1ms LLM_first=2187ms LLM_total=2249ms TTS_first=1374ms Total=6105ms
+11:57:58 | INFO     | [NETWORK] stt_roundtrip=743ms chat_roundtrip=2385ms tts_first_byte=1374ms | unaccounted_gap=117ms
+11:57:59 | INFO     | [WAKE] Playing TTS response...
+11:58:13 | INFO     | [WAKE] Partial match score: 0.54
+11:58:13 | INFO     | [WAKE] Wake word detected! (Score: 0.54)
+11:58:13 | INFO     | [WAKE] Recording...
+11:58:14 | INFO     | [WAKE] Silence detected, stopping.
+11:58:14 | INFO     | [AUDIO] Uploading WAV: size=49196 bytes (~1.5s of audio, uncompressed PCM)
+11:58:15 | INFO     | HTTP Request: POST http://127.0.0.1:8000/stt "HTTP/1.1 200 OK"
+11:58:15 | INFO     | [NETWORK] STT: rtt=473ms | server_processing=462ms | network_overhead=11ms
+11:58:15 | INFO     | [WAKE] Recognized: Thank you
+11:58:17 | INFO     | HTTP Request: POST http://127.0.0.1:8000/chat "HTTP/1.1 200 OK"
+11:58:17 | INFO     | [NETWORK] Chat: rtt=2160ms | server_llm=2038ms | network+overhead=122ms
+11:58:17 | INFO     | [WAKE] JARVIS replied: You're welcome, Boss. I hope your preparations for the interview are going well, and I'm here to help if you need anything else. By the way, I noticed you've had a busy day with 11 web searches, and I hope you're getting some rest before the big day tomorrow.
+11:58:17 | INFO     | HTTP Request: POST http://127.0.0.1:8000/tts "HTTP/1.1 200 OK"
+11:58:18 | INFO     | [LATENCY] VAD=1486ms STT=473ms Memory=1ms LLM_first=1969ms LLM_total=2038ms TTS_first=1174ms Total=5297ms
+11:58:18 | INFO     | [NETWORK] stt_roundtrip=473ms chat_roundtrip=2160ms tts_first_byte=1174ms | unaccounted_gap=4ms
+11:58:19 | INFO     | [WAKE] Playing TTS response...
+11:58:36 | INFO     | [WAKE] Partial match score: 0.41
+11:58:36 | INFO     | [WAKE] Wake word detected! (Score: 0.41)
+11:58:36 | INFO     | [WAKE] Recording...
+11:58:37 | INFO     | [WAKE] Silence detected, stopping.
+11:58:37 | INFO     | [AUDIO] Uploading WAV: size=49196 bytes (~1.5s of audio, uncompressed PCM)
+11:58:38 | INFO     | HTTP Request: POST http://127.0.0.1:8000/stt "HTTP/1.1 200 OK"
+11:58:38 | INFO     | [NETWORK] STT: rtt=418ms | server_processing=393ms | network_overhead=25ms
+11:58:38 | INFO     | [WAKE] Recognized: Thank you
+11:58:43 | INFO     | HTTP Request: POST http://127.0.0.1:8000/chat "HTTP/1.1 200 OK"
+11:58:43 | INFO     | [NETWORK] Chat: rtt=5402ms | server_llm=5290ms | network+overhead=112ms
+11:58:43 | INFO     | [WAKE] JARVIS replied: You're welcome, Boss. I'm waiting for your next instruction or topic to discuss, whether it's about My-PA or anything else on your mind.
+11:58:43 | INFO     | HTTP Request: POST http://127.0.0.1:8000/tts "HTTP/1.1 200 OK"
+11:58:45 | INFO     | [LATENCY] VAD=1483ms STT=418ms Memory=0ms LLM_first=5234ms LLM_total=5290ms TTS_first=1332ms Total=8638ms
+11:58:45 | INFO     | [NETWORK] stt_roundtrip=418ms chat_roundtrip=5402ms tts_first_byte=1332ms | unaccounted_gap=3ms
+11:58:46 | INFO     | [WAKE] Playing TTS response...
+11:58:56 | INFO     | [WAKE] Partial match score: 0.99
+11:58:56 | INFO     | [WAKE] Wake word detected! (Score: 0.99)
+11:58:56 | INFO     | [WAKE] Recording...
+11:58:57 | INFO     | [WAKE] Silence detected, stopping.
+11:58:57 | INFO     | [AUDIO] Uploading WAV: size=49196 bytes (~1.5s of audio, uncompressed PCM)
+11:58:58 | INFO     | HTTP Request: POST http://127.0.0.1:8000/stt "HTTP/1.1 200 OK"
+11:58:58 | INFO     | [NETWORK] STT: rtt=508ms | server_processing=494ms | network_overhead=14ms
+11:58:58 | INFO     | [WAKE] Recognized: Thank you
+11:59:03 | INFO     | HTTP Request: POST http://127.0.0.1:8000/chat "HTTP/1.1 200 OK"
+11:59:03 | INFO     | [NETWORK] Chat: rtt=5089ms | server_llm=4981ms | network+overhead=108ms
+11:59:03 | INFO     | [WAKE] JARVIS replied: You're welcome, Boss. I'll be here when you're ready to proceed with the next steps for My-PA or need assistance with anything else.
+11:59:03 | INFO     | HTTP Request: POST http://127.0.0.1:8000/tts "HTTP/1.1 200 OK"
+11:59:04 | INFO     | [LATENCY] VAD=1484ms STT=508ms Memory=0ms LLM_first=4918ms LLM_total=4981ms TTS_first=1188ms Total=8273ms
+11:59:04 | INFO     | [NETWORK] stt_roundtrip=508ms chat_roundtrip=5089ms tts_first_byte=1188ms | unaccounted_gap=4ms
+11:59:05 | INFO     | [WAKE] Playing TTS response...
