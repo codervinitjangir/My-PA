@@ -1,0 +1,46 @@
+11:12:36 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:12:38 | INFO     | [WS] Connected to JARVIS server!
+11:12:39 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+11:12:39 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+11:12:40 | INFO     | [WAKE] Input stream started.
+11:14:50 | INFO     | [WAKE] Partial match score: 0.11
+11:14:50 | INFO     | [WAKE] Partial match score: 0.10
+11:16:36 | WARNING  | [WS] Closed with error: no close frame received or sent
+11:16:41 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:16:45 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:16:55 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:16:59 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:17:19 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:17:23 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:17:51 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:17:52 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+11:17:52 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+11:17:53 | INFO     | [WAKE] Input stream started.
+11:17:55 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:18:00 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:18:04 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:18:14 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:18:18 | WARNING  | [WS] Network error: [WinError 1225] The remote computer refused the network connection
+11:18:38 | INFO     | [WS] Connecting to ws://localhost:8000/laptop/ws?token=jarvis-auth-token-98f2c7a3 ...
+11:18:40 | INFO     | [WS] Connected to JARVIS server!
+11:19:21 | INFO     | [WAKE] Partial match score: 0.23
+11:19:21 | INFO     | [WAKE] Partial match score: 0.32
+11:19:21 | INFO     | [WAKE] Partial match score: 0.44
+11:19:21 | INFO     | [WAKE] Wake word detected! (Score: 0.44)
+11:19:21 | INFO     | [WAKE] Recording...
+11:19:29 | INFO     | [WAKE] Recognized: How are you? And what are you doing
+11:19:34 | INFO     | [WAKE] JARVIS replied: I'm functioning normally, Boss. I'm currently ready to assist you with any tasks or questions you may have, and I've taken note that you have an important interview tomorrow, so I'm prepared to help in any way I can to ensure you're well-prepared.
+11:19:37 | INFO     | [LATENCY] VAD=910ms STT=3205ms Memory=0ms LLM_first=2250ms LLM_total=2263ms TTS_first=3330ms Total=12031ms
+11:19:38 | INFO     | [WAKE] Playing TTS response...
+11:19:38 | ERROR    | [WAKE] TTS play failed: No module named 'playsound'
+11:19:39 | INFO     | [WAKE] Partial match score: 0.38
+11:19:39 | INFO     | [WAKE] Partial match score: 0.26
+11:19:39 | INFO     | [WAKE] Partial match score: 0.23
+11:19:39 | INFO     | [WAKE] Partial match score: 0.11
+11:19:55 | INFO     | [WAKE] Partial match score: 0.16
+11:20:06 | INFO     | [WAKE] Partial match score: 0.10
+11:20:06 | INFO     | [WAKE] Partial match score: 0.16
+11:20:06 | INFO     | [WAKE] Partial match score: 0.11
+11:20:06 | INFO     | [WAKE] Partial match score: 0.28
+11:20:21 | INFO     | [WAKE] Partial match score: 0.10
+11:20:22 | INFO     | [WAKE] Partial match score: 0.11

@@ -825,7 +825,10 @@ async def chat(chat_req: ChatRequest, request: Request, x_api_key: Optional[str]
 
     try:
         session_id = chat_service.get_or_create_session(chat_req.session_id)
-        response_text = request_router.process_request(session_id, chat_req.message)
+        # Offload blocking sync Groq SDK call to thread pool — freeing the event loop
+        response_text = await asyncio.to_thread(
+            request_router.process_request, session_id, chat_req.message
+        )
         chat_service.save_chat_session(session_id)
         logger.info("[API /chat] Done | session_id=%s | response_len=%d", session_id[:12], len(response_text))
         
@@ -1134,10 +1137,12 @@ async def speech_to_text(
     logger.info("[API /stt] Received audio | file=%s | size=%d bytes | lang=%s",
                 filename, len(audio_bytes), language or "auto")
 
-    result = stt_service.transcribe(
-        audio_bytes=audio_bytes,
-        filename=filename,
-        language=language or None,
+    # Offload blocking sync Groq SDK call to thread pool — freeing the event loop
+    result = await asyncio.to_thread(
+        stt_service.transcribe,
+        audio_bytes,
+        filename,
+        language or None,
     )
 
     if result.get("error") and not result.get("text"):

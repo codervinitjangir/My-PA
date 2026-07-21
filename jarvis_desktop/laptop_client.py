@@ -25,7 +25,7 @@ import tempfile
 import time
 import wave
 import uuid
-import requests
+import httpx
 import numpy as np
 
 try:
@@ -68,6 +68,15 @@ RECONNECT_DELAY_MAX     = 60
 
 # Backend chat API requires a strict UUID4 session ID
 CLIENT_SESSION_ID = str(uuid.uuid4())
+
+# Persistent HTTP client — reuses TCP connections across all STT/chat/TTS calls
+# This avoids a fresh TCP+TLS handshake on every voice interaction
+HTTP_CLIENT = httpx.Client(
+    base_url=RENDER_URL,
+    headers=HEADERS,
+    timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0),
+    follow_redirects=True,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -497,15 +506,26 @@ def handle_wake_detection():
     wav_io.close()
 
     # STT Request
-    stt_url = f"{RENDER_URL}/stt"
     try:
+        audio_size_bytes = len(wav_bytes)
+        audio_duration_secs = audio_size_bytes / (16000 * 2)  # 16kHz, 16-bit (2 bytes/sample)
+        logger.info("[AUDIO] Uploading WAV: size=%d bytes (~%.1fs of audio, uncompressed PCM)",
+                    audio_size_bytes, audio_duration_secs)
         files = {'file': ('audio.wav', wav_bytes, 'audio/wav')}
-        stt_start = time.perf_counter()
-        r = requests.post(stt_url, headers=HEADERS, files=files, timeout=10)
-        stt_end = time.perf_counter()
-        metrics["STT"] = int((stt_end - stt_start) * 1000)
+        stt_rtt_start = time.perf_counter()
+        r = HTTP_CLIENT.post("/stt", files=files)
+        stt_rtt_end = time.perf_counter()
+        stt_rtt_ms = int((stt_rtt_end - stt_rtt_start) * 1000)
+        metrics["STT"] = stt_rtt_ms
+        metrics["_stt_rtt"] = stt_rtt_ms
         r.raise_for_status()
         stt_resp = r.json()
+        stt_server_ms = stt_resp.get("transcription_time_ms")
+        if stt_server_ms:
+            logger.info("[NETWORK] STT: rtt=%dms | server_processing=%dms | network_overhead=%dms",
+                        stt_rtt_ms, stt_server_ms, stt_rtt_ms - stt_server_ms)
+        else:
+            logger.info("[NETWORK] STT: rtt=%dms", stt_rtt_ms)
         text = stt_resp.get("text", "").strip()
         if not text:
             logger.info("[WAKE] No speech detected.")
@@ -516,19 +536,24 @@ def handle_wake_detection():
         return
         
     # Chat Request
-    chat_url = f"{RENDER_URL}/chat"
     try:
-        chat_req = {"message": text, "session_id": CLIENT_SESSION_ID}
-        h = HEADERS.copy()
-        h["Content-Type"] = "application/json"
-        
-        r2 = requests.post(chat_url, headers=h, json=chat_req, timeout=30)
+        chat_payload = {"message": text, "session_id": CLIENT_SESSION_ID}
+        chat_rtt_start = time.perf_counter()
+        r2 = HTTP_CLIENT.post("/chat", json=chat_payload)
+        chat_rtt_end = time.perf_counter()
+        chat_rtt_ms = int((chat_rtt_end - chat_rtt_start) * 1000)
+        metrics["_chat_rtt"] = chat_rtt_ms
         r2.raise_for_status()
         chat_resp = r2.json()
         
         metrics["Memory"] = chat_resp.get("memory_ms") or 0
         metrics["LLM_first"] = chat_resp.get("llm_first_ms") or 0
         metrics["LLM_total"] = chat_resp.get("llm_total_ms") or 0
+        
+        llm_total = metrics["LLM_total"]
+        chat_overhead_ms = max(0, chat_rtt_ms - llm_total) if llm_total else chat_rtt_ms
+        logger.info("[NETWORK] Chat: rtt=%dms | server_llm=%dms | network+overhead=%dms",
+                    chat_rtt_ms, llm_total, chat_overhead_ms)
         
         reply_text = chat_resp.get("response", "").strip()
         logger.info("[WAKE] JARVIS replied: %s", reply_text)
@@ -556,38 +581,56 @@ def handle_wake_detection():
         logger.error("[WAKE] Chat failed: %s", e)
 
 def play_tts(text, metrics=None):
-    tts_url = f"{RENDER_URL}/tts"
     try:
         import pygame
-        h = HEADERS.copy()
-        h["Content-Type"] = "application/json"
         
-        tts_start = time.perf_counter()
-        r = requests.post(tts_url, headers=h, json={"text": text}, stream=True, timeout=20)
-        r.raise_for_status()
-        
-        fd, temp_path = tempfile.mkstemp(suffix=".mp3")
-        first_chunk = True
-        with os.fdopen(fd, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    if first_chunk and metrics is not None:
-                        tts_first_time = time.perf_counter()
-                        metrics["TTS_first"] = int((tts_first_time - tts_start) * 1000)
-                        
-                        total_time = int((tts_first_time - metrics["silence_start_time"]) * 1000)
-                        metrics["Total"] = total_time
-                        logger.info("[LATENCY] VAD=%sms STT=%sms Memory=%sms LLM_first=%sms LLM_total=%sms TTS_first=%sms Total=%sms",
-                            metrics.get('VAD'), metrics.get('STT'), metrics.get('Memory'), 
-                            metrics.get('LLM_first'), metrics.get('LLM_total'), 
-                            metrics.get('TTS_first'), metrics.get('Total')
-                        )
-                        first_chunk = False
-                    f.write(chunk)
-                    
+        tts_rtt_start = time.perf_counter()
+        with HTTP_CLIENT.stream("POST", "/tts", json={"text": text}) as r:
+            r.raise_for_status()
+            fd, temp_path = tempfile.mkstemp(suffix=".mp3")
+            first_chunk = True
+            tts_rtt_end = None
+            with os.fdopen(fd, 'wb') as f:
+                for chunk in r.iter_bytes(chunk_size=8192):
+                    if chunk:
+                        if first_chunk and metrics is not None:
+                            tts_first_time = time.perf_counter()
+                            tts_rtt_end = tts_first_time
+                            metrics["TTS_first"] = int((tts_first_time - tts_rtt_start) * 1000)
+                            metrics["_tts_rtt_first"] = metrics["TTS_first"]
+                            
+                            total_time = int((tts_first_time - metrics["silence_start_time"]) * 1000)
+                            metrics["Total"] = total_time
+                            
+                            gap_ms = total_time - (
+                                metrics.get("VAD", 0) +
+                                metrics.get("_stt_rtt", 0) +
+                                metrics.get("_chat_rtt", 0) +
+                                metrics.get("TTS_first", 0)
+                            )
+                            
+                            logger.info("[LATENCY] VAD=%sms STT=%sms Memory=%sms LLM_first=%sms LLM_total=%sms TTS_first=%sms Total=%sms",
+                                metrics.get('VAD'), metrics.get('STT'), metrics.get('Memory'), 
+                                metrics.get('LLM_first'), metrics.get('LLM_total'), 
+                                metrics.get('TTS_first'), metrics.get('Total')
+                            )
+                            logger.info("[NETWORK] stt_roundtrip=%dms chat_roundtrip=%dms tts_first_byte=%dms | unaccounted_gap=%dms",
+                                metrics.get('_stt_rtt', 0),
+                                metrics.get('_chat_rtt', 0),
+                                metrics.get('TTS_first', 0),
+                                gap_ms
+                            )
+                            first_chunk = False
+                        f.write(chunk)
+
         logger.info("[WAKE] Playing TTS response...")
-        from playsound import playsound
-        playsound(temp_path)
+        pygame.mixer.init()
+        pygame.mixer.music.load(temp_path)
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+        pygame.mixer.quit()
+
         
         try:
             os.remove(temp_path)

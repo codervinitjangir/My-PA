@@ -200,6 +200,7 @@ class STTService:
             "text": text,
             "language": detected_lang,
             "duration": float(duration),
+            "transcription_time_ms": int(elapsed * 1000),
             "error": None,
         }
 
