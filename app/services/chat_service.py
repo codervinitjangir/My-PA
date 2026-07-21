@@ -326,7 +326,8 @@ class ChatService:
         for chunk in self.groq_service.stream_response(
             question=enriched_question, 
             chat_history=chat_history, 
-            key_start_index=chat_idx
+            key_start_index=chat_idx,
+            raw_message=user_message
         ):
             if isinstance(chunk, str):
                 if not first_token:
@@ -493,7 +494,8 @@ class ChatService:
             for chunk in self.groq_service.stream_response(
                 question=enriched_question, 
                 chat_history=chat_history, 
-                key_start_index=chat_idx
+                key_start_index=chat_idx,
+                raw_message=user_message
             ):
                 if isinstance(chunk, dict):
                     yield chunk
@@ -604,7 +606,8 @@ class ChatService:
                 question=enriched_question, 
                 chat_history=chat_history, 
                 key_start_index=chat_idx,
-                use_search=True
+                use_search=True,
+                raw_message=user_message
             ):
                 if isinstance(chunk, dict):
                     yield chunk

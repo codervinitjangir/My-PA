@@ -99,12 +99,19 @@ class LLMRouter:
         chat_history: Optional[List[tuple]] = None,
         key_start_index: int = 0,
         use_search: bool = False,
+        raw_message: Optional[str] = None,
     ) -> str:
         """
         Non-streaming call with full 4-tier fallback.
         Complexity → Tier 3 directly; otherwise Tier 1 → 2 → 3 → 4.
+
+        `raw_message`: the bare user query before memory/context enrichment.
+        Used exclusively for the is_complex() routing gate so that injected
+        memory prefixes don't artificially trigger the complex-query path.
+        Falls back to `question` if not provided (backward-compatible).
         """
-        if is_complex(question) and self.agent_router:
+        _routing_msg = raw_message if raw_message is not None else question
+        if is_complex(_routing_msg) and self.agent_router:
             self._log_routing(3, DEEP_MODEL, "complex query detected")
             try:
                 return self.agent_router.call(
@@ -183,13 +190,20 @@ class LLMRouter:
         chat_history: Optional[List[tuple]] = None,
         key_start_index: int = 0,
         use_search: bool = False,
+        raw_message: Optional[str] = None,
         **kwargs
     ) -> Iterator[Any]:
         """
         Streaming call with 4-tier fallback.
         Fallback only triggers if the failure occurs before the first chunk.
         Once streaming has started, that provider owns the stream.
+
+        `raw_message`: the bare user query before memory/context enrichment.
+        Used exclusively for the is_complex() routing gate so that injected
+        memory prefixes don't artificially trigger the complex-query path.
+        Falls back to `question` if not provided (backward-compatible).
         """
+        _routing_msg = raw_message if raw_message is not None else question
         # ── If search results needed and we have search infrastructure ──────────
         # For Gemini/AgentRouter, pre-fetch search here so they can inject it.
         formatted_results = ""
@@ -243,7 +257,9 @@ class LLMRouter:
                 yield from self.groq_provider.stream_response(question, chat_history, key_start_index, use_search, **kwargs)
 
         # Route complex queries directly to Tier 3
-        if is_complex(question) and self.agent_router:
+        # NOTE: use _routing_msg (raw user text) so memory prefixes don't
+        # inflate the length and falsely trigger the complex-query path.
+        if is_complex(_routing_msg) and self.agent_router:
             self._log_routing(3, DEEP_MODEL, "complex query — stream")
             stream, ok = self._try_stream(_claude_stream, "agentrouter (claude)", prompt_size)
             if ok:
