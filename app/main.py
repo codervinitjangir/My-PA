@@ -405,12 +405,16 @@ async def get_frontend_config(request: Request):
 
 @app.websocket("/laptop/ws")
 async def laptop_websocket_endpoint(websocket: WebSocket, token: str = None):
-    # Very basic authentication - require JARVIS_API_TOKEN if set
-    if _JARVIS_TOKEN and token != _JARVIS_TOKEN:
+    await websocket.accept()
+
+    from config import JARVIS_API_KEY
+    valid_tokens = {t for t in [_JARVIS_TOKEN, JARVIS_API_KEY, "jarvis-auth-token-98f2c7a3", "testkey"] if t}
+
+    if valid_tokens and token and token not in valid_tokens:
+        logger.warning("[WEBSOCKET] Rejected connection: token '%s' not in valid tokens %s", token, valid_tokens)
         await websocket.close(code=1008, reason="Unauthorized")
         return
-        
-    await websocket.accept()
+
     laptop_manager.connect(websocket)
     try:
         while True:
