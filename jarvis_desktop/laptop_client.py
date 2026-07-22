@@ -631,6 +631,16 @@ def handle_wake_detection():
             app_target = app_matches[0].lower()
             logger.info("[WAKE] Auto-opening app from reply: %s", app_target)
             handle_open_app({"target": app_target})
+
+        # Detect lock screen or scroll in voice mode reply text
+        if any(w in reply_text.lower() for w in ["locked your pc", "locked your screen", "lock signal", "screen locked"]):
+            logger.info("[WAKE] Auto-locking screen from reply text")
+            handle_lock_screen({})
+
+        if "scrolled" in reply_text.lower():
+            direction = "up" if "up" in reply_text.lower() else "down"
+            logger.info("[WAKE] Auto-scrolling %s from reply text", direction)
+            handle_scroll({"direction": direction, "amount": 500})
         
         if reply_text:
             # Strip the URL so Jarvis doesn't awkwardly read out "h t t p s colon slash slash..."
