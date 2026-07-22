@@ -480,7 +480,7 @@ def wake_word_thread():
                         if score > 0.2:
                             logger.info("[WAKE] Partial match score: %.2f", score)
                             
-                        if score >= 0.35:
+                        if score >= 0.42:
                             now = time.time()
                             global _LAST_WAKE_TIME
                             if now - _LAST_WAKE_TIME < _WAKE_COOLDOWN_SECS:
@@ -697,12 +697,18 @@ def play_tts(text, metrics=None):
                         f.write(chunk)
 
         logger.info("[WAKE] Playing TTS response...")
-        pygame.mixer.init()
-        pygame.mixer.music.load(temp_path)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
-        pygame.mixer.quit()
+        global WAKE_WORD_PAUSED
+        WAKE_WORD_PAUSED = True
+        try:
+            pygame.mixer.init()
+            pygame.mixer.music.load(temp_path)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                pygame.time.Clock().tick(10)
+            pygame.mixer.quit()
+        finally:
+            time.sleep(0.6)  # Give speaker echo time to clear
+            WAKE_WORD_PAUSED = False
 
         
         try:

@@ -64,9 +64,10 @@ class STTService:
         return len(self._groq_clients) > 0
 
     DEFAULT_PROMPT = (
-        "JARVIS, Jarvis, brief, calendar, Gmail, email, CloudStream, "
-        "Groq, Telegram, schedule, reminder, meeting, download, PDF, "
-        "send file, screen, analyze, open, play, search"
+        "JARVIS, Jarvis, Hindi, Hinglish, bolo, kaise ho, kya hal hai, "
+        "kya kar rahe ho, kholo, band karo, lock, scroll up, scroll down, "
+        "youtube, notepad, brief, calendar, Gmail, email, Groq, Telegram, "
+        "schedule, reminder, meeting, download, open, play, search"
     )
 
     def transcribe(
