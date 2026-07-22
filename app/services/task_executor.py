@@ -120,6 +120,10 @@ class TaskExecutor:
                                 tool = ToolRegistry.get_tool("open_desktop_app")
                                 if tool.execute(app_target=app_target):
                                     response.desktop_apps.append(app_target)
+                            elif result.startswith("system:"):
+                                sys_action = result[7:]
+                                response.desktop_apps.append(sys_action)
+                                response.text = f"Locked your PC screen."
                             else:
                                 response.wopens.append(result)
                             
@@ -282,15 +286,31 @@ class TaskExecutor:
     def _do_open(self, payload: dict) -> Optional[str]:
         target = (payload.get("url") or payload.get("target") or payload.get("query") or payload.get("message") or "").strip()
         
-        if target.startswith("app:"):
+        if target.startswith("app:") or target.startswith("system:"):
             return target
             
         if not target:
             return None
 
+        t_lower = target.lower()
+
+        # System actions
+        if any(k in t_lower for k in ["lock pc", "lock my pc", "lock screen", "lock laptop"]):
+            from config import IS_CLOUD
+            if IS_CLOUD:
+                from app.websocket_manager import laptop_manager
+                laptop_manager.send_and_wait("lock_screen")
+            else:
+                try:
+                    import ctypes
+                    ctypes.windll.user32.LockWorkStation()
+                except Exception as e:
+                    logger.error(f"[SYSTEM] Lock screen failed: {e}")
+            return "system:lock_screen"
+
         app_names = {"notepad", "calc", "calculator", "cmd", "powershell", "explorer", "chrome", "code", "vscode", "terminal"}
-        if target.lower() in app_names:
-            return f"app:{target.lower()}"
+        if t_lower in app_names:
+            return f"app:{t_lower}"
 
         return self._validate_url(target)
 
