@@ -28,7 +28,21 @@ class LaunchAppTool(BaseTool):
         if not target:
             target = app_name  # Attempt direct invocation if not mapped
             
-        logger.info(f"[LAUNCHER] Attempting to launch '{target}'")
+        from config import IS_CLOUD
+        logger.info(f"[LAUNCHER] Attempting to launch '{target}' (IS_CLOUD={IS_CLOUD})")
+
+        if IS_CLOUD:
+            from app.websocket_manager import laptop_manager
+            if laptop_manager.is_connected():
+                logger.info(f"[LAUNCHER] Routing open_app '{target}' to laptop via WebSocket")
+                resp = laptop_manager.send_and_wait(action="open_app", payload={"target": target})
+                if resp.get("status") == "success":
+                    return {"status": "success", "message": f"Launched {target} on laptop"}
+                else:
+                    return {"status": "error", "message": f"Failed to launch {target} on laptop: {resp.get('message')}"}
+            else:
+                return {"status": "error", "message": f"Laptop client is offline. Connect laptop_client.py to open {target}."}
+
         try:
             os.startfile(target)
             return {"status": "success", "message": f"Launched {target}"}

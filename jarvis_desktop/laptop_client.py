@@ -580,8 +580,7 @@ def handle_wake_detection():
         reply_text = chat_resp.get("response", "").strip()
         logger.info("[WAKE] JARVIS replied: %s", reply_text)
         
-        # --- Auto-Open URLs ---
-        # If JARVIS included a URL in his reply (e.g. for "open youtube"), open it!
+        # --- Auto-Open URLs & Apps ---
         import re
         urls = re.findall(r'(https?://[^\s)\]]+)', reply_text)
         if urls:
@@ -590,6 +589,13 @@ def handle_wake_detection():
                 logger.info("[WAKE] Auto-opened URL from reply: %s", urls[0])
             except Exception as e:
                 logger.error("[WAKE] Failed to auto-open URL: %s", e)
+
+        # Also detect app launch commands in reply text (e.g. "Notepad is now open")
+        app_matches = re.findall(r'(?:launch(?:ed)?|open(?:ed)?|start(?:ed)?)\s+(notepad|calculator|calc|cmd|powershell|explorer|chrome|code|vscode)', reply_text, re.IGNORECASE)
+        if app_matches and not urls:
+            app_target = app_matches[0].lower()
+            logger.info("[WAKE] Auto-opening app from reply: %s", app_target)
+            handle_open_app({"target": app_target})
         
         if reply_text:
             # Strip the URL so Jarvis doesn't awkwardly read out "h t t p s colon slash slash..."
