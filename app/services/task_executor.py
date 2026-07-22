@@ -280,14 +280,19 @@ class TaskExecutor:
             return None
 
     def _do_open(self, payload: dict) -> Optional[str]:
-        url = payload.get("url", "").strip()
+        target = (payload.get("url") or payload.get("target") or payload.get("query") or payload.get("message") or "").strip()
         
-        if url.startswith("app:"):
-            return url
+        if target.startswith("app:"):
+            return target
             
-        if not url:
+        if not target:
             return None
-        return self._validate_url(url)
+
+        app_names = {"notepad", "calc", "calculator", "cmd", "powershell", "explorer", "chrome", "code", "vscode", "terminal"}
+        if target.lower() in app_names:
+            return f"app:{target.lower()}"
+
+        return self._validate_url(target)
 
     def _do_play(self, payload: dict) -> Optional[str]:
         query = (payload.get("query", payload.get("message", "")) or "").strip()[:500]

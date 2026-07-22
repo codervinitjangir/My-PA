@@ -734,7 +734,7 @@ Classify. Output EXACTLY ONE category name."""
         if any(x in m for x in ["check calendar", "my schedule", "meeting", "event"]):
             tasks.append("check_calendar")
 
-        return tasks if tasks else ["open"]
+        return tasks if tasks else ["chat"]
 
     SITE_MAP = {
         "facebook": "https://www.facebook.com", "instagram": "https://www.instagram.com",

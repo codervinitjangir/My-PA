@@ -257,6 +257,18 @@ def consume_jarvis_stream(chat_service, session_id, text, imgbase64=None):
                                 webbrowser.open(url)
                         except Exception as e:
                             logger.error(f"[TELEGRAM] Failed to open URL on host PC: {e}")
+            if actions.get("desktop_apps"):
+                for app_target in actions["desktop_apps"]:
+                    try:
+                        from config import IS_CLOUD
+                        if IS_CLOUD:
+                            from app.websocket_manager import laptop_manager
+                            laptop_manager.send_and_wait(action="open_app", payload={"target": app_target})
+                        else:
+                            import os
+                            os.startfile(app_target)
+                    except Exception as e:
+                        logger.error(f"[TELEGRAM] Failed to open app on host PC: {e}")
             if actions.get("images"):
                 links.extend(actions["images"])
                     
