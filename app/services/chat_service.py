@@ -288,81 +288,21 @@ class ChatService:
 
     def process_message(self, session_id: str, user_message: str) -> str:
         self.last_metrics[session_id] = {}
+        logger.info("[GENERAL-JARVIS] Session: %s | User: %.200s", session_id[:12], user_message)
         
-        logger.info(
-            "[GENERAL] Session: %s | User: %.200s", 
-            session_id[:12], 
-            user_message
-        )
-        
-        self.add_message(session_id, "user", user_message)
-        chat_history = self.format_history_for_llm(session_id, exclude_last=True)
-        
-        # Start Memory Timing
-        mem_start = time.perf_counter()
-        
-        mem_prefix = ""
-        if self.memory_service:
-            recent = [str(m.content) for m in self.sessions.get(session_id, [])[:-2][-3:]]
-            mem_prefix = self.memory_service.build_memory_context(session_id, user_message, recent)
-        enriched_question = f"{mem_prefix}\n{user_message}".strip() if mem_prefix else user_message
-        enriched_question = self._apply_preset_to_question(session_id, enriched_question)
-        
-        mem_end = time.perf_counter()
-        self.last_metrics[session_id]["Memory"] = int((mem_end - mem_start) * 1000)
-        
-        logger.info(
-            "[GENERAL] History pairs sent to LLM: %d", 
-            len(chat_history)
-        )
-
-        _, chat_idx = get_next_key_pair(len(GROQ_API_KEYS), need_brain=False)
-        
-        # Start LLM Timing
-        llm_start = time.perf_counter()
-        response_text = ""
-        first_token = False
-        
-        for chunk in self.groq_service.stream_response(
-            question=enriched_question, 
-            chat_history=chat_history, 
-            key_start_index=chat_idx,
-            raw_message=user_message
-        ):
+        # Route through unified JARVIS brain stream so tasks, actions, and WebSocket commands execute!
+        response_parts = []
+        for chunk in self.process_jarvis_message_stream(session_id, user_message):
             if isinstance(chunk, str):
-                if not first_token:
-                    llm_first = time.perf_counter()
-                    self.last_metrics[session_id]["LLM_first"] = int((llm_first - llm_start) * 1000)
-                    first_token = True
-                response_text += chunk
-            
-        llm_end = time.perf_counter()
-        self.last_metrics[session_id]["LLM_total"] = int((llm_end - llm_start) * 1000)
-        
-        response = response_text
+                response_parts.append(chunk)
+            elif isinstance(chunk, dict) and "text" in chunk:
+                response_parts.append(chunk["text"])
 
-        self.add_message(session_id, "assistant", response)
-        
-        logger.info(
-            "[GENERAL] Response length: %d chars | Preview: %.120s", 
-            len(response), 
-            response
-        )
-        
-        self.save_chat_session(session_id)
-        self.update_vector_store_live(session_id)
-        if self.memory_service:
-            _snapshot = list(self.sessions[session_id])
-            def _run_summarise():
-                summary = self.memory_service.maybe_summarise(session_id, _snapshot, self.groq_service)
-                if summary:
-                    with self._save_lock:
-                        if len(self.sessions[session_id]) > 6:
-                            summary_msg = ChatMessage(role="system", content=f"Previous Context Summary:\n{summary}")
-                            self.sessions[session_id] = [summary_msg] + self.sessions[session_id][-6:]
-                            self.save_chat_session(session_id, log_timing=False)
-            Thread(target=_run_summarise).start()
-        return response
+        response = "".join(response_parts).strip()
+        if not response and session_id in self.sessions and self.sessions[session_id]:
+            response = self.sessions[session_id][-1].content or "Task executed, Boss."
+
+        return response or "Task executed, Boss."
 
     def process_realtime_message(self, session_id: str, user_message: str) -> str:
 
