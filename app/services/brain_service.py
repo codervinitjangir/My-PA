@@ -273,6 +273,16 @@ class BrainService:
             return (["open"], "empty", 0)
 
         m_lower = msg.lower()
+
+        if "lock" in m_lower:
+            self._last_task_decisions = [("open", "lock_screen")]
+            return (["open"], "rule-fast", 0)
+
+        if "scroll" in m_lower:
+            direction = "up" if "up" in m_lower else "down"
+            self._last_task_decisions = [("open", f"scroll_{direction}")]
+            return (["open"], "rule-fast", 0)
+
         if any(x in m_lower for x in ["open webcam", "turn on camera", "start camera",
                                         "open the webcam", "start the camera", "turn on the camera"]):
             self._last_task_decisions = [("open_webcam", "")]
