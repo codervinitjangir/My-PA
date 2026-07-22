@@ -270,7 +270,21 @@ def handle_scroll(payload: dict) -> dict:
         logger.error("[ACTION] Scroll failed: %s", e)
         return {"success": False, "error": str(e)}
 
+def handle_open_url(payload: dict) -> dict:
+    url = (payload.get("url") or payload.get("target") or "").strip()
+    if not url:
+        return {"status": "error", "message": "No url specified"}
+    try:
+        import webbrowser
+        webbrowser.open(url)
+        logger.info("[URL] Opened: %s", url)
+        return {"status": "success", "message": f"Opened {url}"}
+    except Exception as e:
+        logger.error("[URL] Failed to open %s: %s", url, e)
+        return {"status": "error", "message": str(e)}
+
 HANDLERS = {
+    "open_url":          handle_open_url,
     "open_app":          handle_open_app,
     "capture_screen":    handle_capture_screen,
     "volume_set":        handle_volume_set,

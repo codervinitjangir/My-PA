@@ -708,8 +708,12 @@ Classify. Output EXACTLY ONE category name."""
                                   "close the webcam", "stop the camera", "turn off the camera"]):
             return ["close_webcam"]
 
-        if m.startswith(("open ", "launch ", "go to ", "visit ", "can you open ")) or \
-           ("open" in m and any(s in m for s in ["facebook", "youtube", "google", "netflix", "gmail", "instagram", "twitter", "linkedin"])):
+        if any(x in m for x in ["email", "mail", "inbox", "subject of"]) and not m.startswith(("open gmail", "go to gmail", "visit gmail")):
+            tasks.append("check_emails")
+
+        if (m.startswith(("open ", "launch ", "go to ", "visit ", "can you open ")) or \
+           ("open" in m and any(s in m for s in ["facebook", "youtube", "google", "netflix", "gmail", "instagram", "twitter", "linkedin"]))) \
+           and "check_emails" not in tasks:
             tasks.append("open")
 
         if m.startswith(("play ", "play the ", "play some ")) or " play " in m:
@@ -726,9 +730,6 @@ Classify. Output EXACTLY ONE category name."""
 
         if any(x in m for x in ["search for ", "look up ", "find me ", "google "]) and "youtube" not in m:
             tasks.append("google_search")
-
-        if any(x in m for x in ["check mail", "check email", "read mail", "read email"]):
-            tasks.append("check_emails")
 
         if any(x in m for x in ["check calendar", "my schedule", "meeting", "event"]):
             tasks.append("check_calendar")
