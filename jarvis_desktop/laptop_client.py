@@ -106,6 +106,20 @@ def handle_open_app(payload: dict) -> dict:
     if "scroll" in target.lower():
         direction = "up" if "up" in target.lower() else "down"
         return handle_scroll({"direction": direction, "amount": 500})
+
+    if target.lower() in ("telegram", "telegram.exe"):
+        appdata = os.getenv("APPDATA", "")
+        tg_path = os.path.join(appdata, "Telegram Desktop", "Telegram.exe")
+        if os.path.exists(tg_path):
+            target = tg_path
+        else:
+            try:
+                import webbrowser
+                webbrowser.open("https://web.telegram.org")
+                return {"status": "success", "message": "Opened Telegram Web"}
+            except Exception as e:
+                logger.error("[OPEN] Failed to open Telegram Web: %s", e)
+                return {"status": "error", "message": str(e)}
     try:
         os.startfile(target)
         logger.info("[OPEN] Opened: %s", target)

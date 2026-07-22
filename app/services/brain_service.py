@@ -767,6 +767,7 @@ Classify. Output EXACTLY ONE category name."""
         "netflix": "https://www.netflix.com", "twitter": "https://twitter.com",
         "x.com": "https://x.com", "gmail": "https://mail.google.com",
         "whatsapp": "https://web.whatsapp.com", "linkedin": "https://www.linkedin.com",
+        "telegram": "https://web.telegram.org",
         "reddit": "https://www.reddit.com", "discord": "https://discord.com/app",
         "spotify": "https://open.spotify.com", "tiktok": "https://www.tiktok.com",
         "amazon": "https://www.amazon.com", "github": "https://github.com",
