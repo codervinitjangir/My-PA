@@ -332,6 +332,8 @@ async def connect_and_listen():
 # ── Wake Word Daemon ──────────────────────────────────────────────────────────
 
 WAKE_WORD_PAUSED = False
+_LAST_WAKE_TIME = 0.0  # epoch seconds of last trigger
+_WAKE_COOLDOWN_SECS = 2.0  # min seconds between triggers
 QUIT_FLAG = False
 TRAY_ICON = None
 
@@ -440,10 +442,17 @@ def wake_word_thread():
                     prediction = owwModel.predict(pcm)
                     
                     for mdl, score in prediction.items():
-                        if score > 0.1:
+                        if score > 0.2:
                             logger.info("[WAKE] Partial match score: %.2f", score)
                             
-                        if score > 0.3:
+                        if score > 0.45:
+                            now = time.time()
+                            global _LAST_WAKE_TIME
+                            if now - _LAST_WAKE_TIME < _WAKE_COOLDOWN_SECS:
+                                logger.info("[WAKE] Trigger suppressed (cooldown %.1fs remaining)",
+                                            _WAKE_COOLDOWN_SECS - (now - _LAST_WAKE_TIME))
+                                continue
+                            _LAST_WAKE_TIME = now
                             logger.info("[WAKE] Wake word detected! (Score: %.2f)", score)
                             handle_wake_detection()
                             
