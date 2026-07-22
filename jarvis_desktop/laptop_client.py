@@ -55,11 +55,14 @@ if API_TOKEN:
     WS_URL += f"?token={API_TOKEN}"
 
 # Build Auth Headers for HTTP Requests
+# Send BOTH tokens: AuthMiddleware checks Bearer, /chat checks X-API-Key.
+# Use API_KEY as Bearer fallback if API_TOKEN doesn't match the server's value.
+_bearer = API_TOKEN or API_KEY
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
-if API_TOKEN:
-    HEADERS["Authorization"] = f"Bearer {API_TOKEN}"
+if _bearer:
+    HEADERS["Authorization"] = f"Bearer {_bearer}"
 if API_KEY:
     HEADERS["X-API-Key"] = API_KEY
 
@@ -440,7 +443,7 @@ def wake_word_thread():
                         if score > 0.1:
                             logger.info("[WAKE] Partial match score: %.2f", score)
                             
-                        if score > 0.4:
+                        if score > 0.3:
                             logger.info("[WAKE] Wake word detected! (Score: %.2f)", score)
                             handle_wake_detection()
                             
@@ -530,7 +533,17 @@ def handle_wake_detection():
         if not text:
             logger.info("[WAKE] No speech detected.")
             return
-        logger.info("[WAKE] Recognized: %s", text)
+        logger.info("[WAKE] Recognized (raw): %s", text)
+
+        # Strip wake word prefix so "Hey Jarvis, open YouTube" → "open YouTube"
+        import re as _re
+        text = _re.sub(
+            r'^\s*(hey|hello|hi|ok|yo)?\s*jarvis[,;:!.\s]*',
+            '', text, count=1, flags=_re.IGNORECASE
+        ).strip()
+        if not text:
+            text = "Hello"  # They just said the wake word with no command
+        logger.info("[WAKE] Command after stripping wake word: %s", text)
     except Exception as e:
         logger.error("[WAKE] STT failed: %s", e)
         return
