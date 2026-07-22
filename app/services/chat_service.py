@@ -989,52 +989,55 @@ class ChatService:
                 self.save_chat_session(session_id)
                 return
             else:
-                # User requested vision but no webcam image provided -> fallback to desktop screen capture
-                yield {
-                    "_activity": {
-                        "event": "vision_processing",
-                        "status": "capturing_screen"
-                    }
-                }
-                
-                try:
-                    from jarvis_os.observers.screen_observer import ScreenObserver
-                    observer = ScreenObserver()
-                    image_bytes = observer.capture_screen()
-                    imgbase64 = observer.sanitize_data(image_bytes)
-                    del image_bytes
-                    
-                    v_t0 = time.perf_counter()
-                    vision_res = self.vision_service.analyze_image(
-                        clean_user_message,
-                        imgbase64,
-                        chat_history
-                    )
-                    v_ms = int((time.perf_counter() - v_t0) * 1000)
-                    del imgbase64
-                    
-                    yield {
-                        "_activity": {
-                            "event": "vision_processing",
-                            "status": "done",
-                            "elapsed_ms": v_ms
+                # User requested vision but no direct image provided -> try laptop screen capture
+                imgbase64_captured = None
+                from config import IS_CLOUD
+                if IS_CLOUD:
+                    from app.websocket_manager import laptop_manager
+                    if laptop_manager.is_connected():
+                        logger.info("[VISION] Requesting screen capture from laptop via WebSocket")
+                        resp = laptop_manager.send_and_wait(action="capture_screen", timeout=5)
+                        if resp.get("status") == "success" and resp.get("image_b64"):
+                            imgbase64_captured = resp.get("image_b64")
+
+                if not imgbase64_captured and not IS_CLOUD:
+                    try:
+                        from jarvis_os.observers.screen_observer import ScreenObserver
+                        observer = ScreenObserver()
+                        image_bytes = observer.capture_screen()
+                        imgbase64_captured = observer.sanitize_data(image_bytes)
+                        del image_bytes
+                    except Exception as e:
+                        logger.warning(f"[VISION] Local screen capture failed: {e}")
+
+                if imgbase64_captured and self.vision_service:
+                    try:
+                        v_t0 = time.perf_counter()
+                        vision_res = self.vision_service.analyze_image(
+                            clean_user_message,
+                            imgbase64_captured,
+                            chat_history
+                        )
+                        v_ms = int((time.perf_counter() - v_t0) * 1000)
+                        
+                        yield {
+                            "_activity": {
+                                "event": "vision_processing",
+                                "status": "done",
+                                "elapsed_ms": v_ms
+                            }
                         }
-                    }
-                    
-                    self.sessions[session_id][-1].content = vision_res
-                    yield vision_res
-                    self.save_chat_session(session_id)
-                    return
-                    
-                except Exception as e:
-                    import logging
-                    log = logging.getLogger("J.A.R.V.I.S")
-                    log.error(f"[ChatService] Screen capture fallback failed: {e}")
-                    no_img_msg = "Please open the webcam or attach an image so I can see what you're referring to."
-                    self.sessions[session_id][-1].content = no_img_msg
-                    yield no_img_msg
-                    self.save_chat_session(session_id)
-                    return
+                        
+                        self.sessions[session_id][-1].content = vision_res
+                        yield vision_res
+                        self.save_chat_session(session_id)
+                        return
+                    except Exception as e:
+                        logger.warning(f"[VISION] Image analysis failed: {e}")
+
+                # If vision capture failed/unavailable, fall through to normal LLM chat below
+                logger.info("[VISION] Vision capture unavailable, falling back to standard LLM response")
+                query_type = "general"
         
         if query_type in ("task", "automation", "mixed") and tasks:
             if self.task_manager and self.brain_service:
