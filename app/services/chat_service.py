@@ -1125,9 +1125,10 @@ class ChatService:
             relevant_tools = list(ToolRegistry.get_relevant_tools(enriched_jarvis_question, top_k=5).values())
             tools_str = "\nAvailable Tools (You can instruct the user to run them if needed):\n" + "\n".join([f"- {t.name}: {t.description}" for t in relevant_tools]) if relevant_tools else ""
             
-            if query_type in ("general", "casual_chat"):
+            query_type_clean = str(query_type).lower().strip()
+            if query_type_clean in ("general", "casual_chat", "realtime"):
                 question_to_send = enriched_jarvis_question
-                if query_type == "casual_chat":
+                if query_type_clean == "casual_chat":
                     question_to_send = f"[CASUAL MODE] This is casual conversation, not a work task. Respond more like texting a friend — shorter, relaxed, occasional humor where it fits. No need to over-explain or offer additional help unless asked.\n\n{question_to_send}"
                     
                 stream = self.groq_service.stream_response(
@@ -1135,7 +1136,8 @@ class ChatService:
                     chat_history=chat_history, 
                     key_start_index=chat_idx,
                     tools_str=tools_str,
-                    intent_dict=intent_dict
+                    intent_dict=intent_dict,
+                    raw_message=clean_user_message
                 )
 
             else:
@@ -1146,7 +1148,8 @@ class ChatService:
                     payload=search_payload,
                     key_start_index=chat_idx,
                     tools_str=tools_str,
-                    intent_dict=intent_dict
+                    intent_dict=intent_dict,
+                    raw_message=clean_user_message
                 )
 
             for chunk in stream:
