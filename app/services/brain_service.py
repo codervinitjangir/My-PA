@@ -390,23 +390,35 @@ class BrainService:
     def _resolve_open_query(self, query: str) -> str:
         q = query.strip().lower()
 
-        if any(k in q for k in ["lock pc", "lock my pc", "lock screen", "lock laptop", "lock"]):
+        if "lock" in q:
             return "system:lock_screen"
+
+        if "scroll" in q:
+            direction = "up" if "up" in q else "down"
+            return f"system:scroll_{direction}"
 
         if q in self.NATIVE_APPS:
             return f"app:{self.NATIVE_APPS[q]}"
 
+        for app_k, app_v in self.NATIVE_APPS.items():
+            if app_k in q:
+                return f"app:{app_v}"
+
         if q in self.SITE_MAP:
             return self.SITE_MAP[q]
+
+        for site_k, site_v in self.SITE_MAP.items():
+            if site_k in q:
+                return site_v
 
         if "." in q:
             return f"https://{q}" if not q.startswith("http") else q
 
-        # If clean app name, check if it's a known executable
+        # If clean single word app name, attempt app launch
         if len(q.split()) == 1 and q.isalnum():
             return f"app:{q}"
 
-        return "https://www.google.com"
+        return ""
 
     def _resolve_correction(self, msg: str, chat_history: Optional[List[Tuple[str, str]]] = None) -> str:
 

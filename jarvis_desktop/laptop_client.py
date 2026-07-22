@@ -77,7 +77,7 @@ CLIENT_SESSION_ID = str(uuid.uuid4())
 HTTP_CLIENT = httpx.Client(
     base_url=RENDER_URL,
     headers=HEADERS,
-    timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0),
+    timeout=httpx.Timeout(connect=10.0, read=45.0, write=45.0, pool=10.0),
     follow_redirects=True,
 )
 
@@ -99,6 +99,13 @@ def handle_open_app(payload: dict) -> dict:
     target = (payload.get("target") or "").strip()
     if not target:
         return {"status": "error", "message": "No target specified"}
+
+    if target.lower() in ("lock_screen", "lock_pc", "lock", "system:lock_screen"):
+        return handle_lock_screen(payload)
+
+    if "scroll" in target.lower():
+        direction = "up" if "up" in target.lower() else "down"
+        return handle_scroll({"direction": direction, "amount": 500})
     try:
         os.startfile(target)
         logger.info("[OPEN] Opened: %s", target)
