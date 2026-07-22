@@ -294,9 +294,12 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from app.utils.wake_word_utils import strip_wake_word
     user_text = strip_wake_word(user_text)
     
+    logger.info("[TELEGRAM INCOMING] chat_id=%s | raw_text=%r | clean_text=%r", update.effective_chat.id, update.message.text, user_text)
+    
     try:
         session_id = chat_service.get_or_create_session("telegram")
         response, actions = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text)
+        logger.info("[TELEGRAM OUTGOING] chat_id=%s | session_id=%s | response=%r | actions=%r", update.effective_chat.id, session_id, (response or "")[:150], actions)
         if response:
             await update.message.reply_text(response[:4090])
         

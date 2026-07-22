@@ -842,8 +842,7 @@ async def chat(chat_req: ChatRequest, request: Request, x_api_key: Optional[str]
     if not chat_service:
         raise HTTPException(status_code=503, detail="Chat service not initialized")
 
-    logger.info("[API /chat] Incoming | session_id=%s | message_len=%d | message=%.100s",
-                chat_req.session_id or "new", len(chat_req.message), chat_req.message)
+    logger.info("[API /chat INCOMING] session_id=%s | message=%r", chat_req.session_id or "new", chat_req.message)
 
     try:
         session_id = chat_service.get_or_create_session(chat_req.session_id)
@@ -852,7 +851,7 @@ async def chat(chat_req: ChatRequest, request: Request, x_api_key: Optional[str]
             request_router.process_request, session_id, chat_req.message
         )
         chat_service.save_chat_session(session_id)
-        logger.info("[API /chat] Done | session_id=%s | response_len=%d", session_id[:12], len(response_text))
+        logger.info("[API /chat OUTGOING] session_id=%s | response=%r", session_id[:12], response_text[:150])
         
         metrics = chat_service.last_metrics.get(session_id, {})
         return ChatResponse(
