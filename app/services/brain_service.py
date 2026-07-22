@@ -691,9 +691,11 @@ Classify. Output EXACTLY ONE category name."""
             "search youtube", "find videos",
             "check mail", "check email", "check my email", "read my mail", "read email",
             "check calendar", "my schedule", "any meeting", "any event",
+            "scroll down", "scroll up", "scroll this", "scroll window", "scroll page",
+            "lock screen", "lock pc", "lock my pc", "lock laptop", "lock my laptop", "lock",
         ]
 
-        if any(m.startswith(p) or p in m for p in task_patterns):
+        if any(m.startswith(p) or p in m for p in task_patterns) or "scroll" in m or "lock" in m:
             return "task"
 
         if any(x in m for x in ["who is ", "who are ", "latest", "current", "news", "weather", "today",
@@ -708,6 +710,9 @@ Classify. Output EXACTLY ONE category name."""
 
         m = (msg or "").strip().lower()
         tasks = []
+
+        if "scroll" in m or "lock" in m:
+            tasks.append("open")
 
         if any(x in m for x in ["open webcam", "turn on camera", "start camera", "show me the camera",
                                   "open the webcam", "start the camera", "turn on the camera"]):

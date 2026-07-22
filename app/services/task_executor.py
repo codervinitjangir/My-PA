@@ -286,17 +286,15 @@ class TaskExecutor:
     def _do_open(self, payload: dict) -> Optional[str]:
         target = (payload.get("url") or payload.get("target") or payload.get("query") or payload.get("message") or "").strip()
         
-        if target.startswith("app:") or target.startswith("system:"):
-            return target
-            
         if not target:
             return None
 
         t_lower = target.lower()
 
         # System actions
-        if any(k in t_lower for k in ["lock pc", "lock my pc", "lock screen", "lock laptop"]):
+        if any(k in t_lower for k in ["lock pc", "lock my pc", "lock screen", "lock laptop", "lock my laptop", "lock_screen", "system:lock_screen"]):
             from config import IS_CLOUD
+            logger.info("[SYSTEM] Processing lock screen action (IS_CLOUD=%s)", IS_CLOUD)
             if IS_CLOUD:
                 from app.websocket_manager import laptop_manager
                 laptop_manager.send_and_wait("lock_screen")
@@ -307,6 +305,23 @@ class TaskExecutor:
                 except Exception as e:
                     logger.error(f"[SYSTEM] Lock screen failed: {e}")
             return "system:lock_screen"
+
+        if target.startswith("app:"):
+            return target
+
+        if "scroll" in t_lower:
+            direction = "up" if "up" in t_lower else "down"
+            from config import IS_CLOUD
+            if IS_CLOUD:
+                from app.websocket_manager import laptop_manager
+                laptop_manager.send_and_wait("scroll", {"direction": direction, "amount": 500})
+            else:
+                try:
+                    import pyautogui
+                    pyautogui.scroll(500 if direction == "up" else -500)
+                except Exception as e:
+                    logger.error(f"[SYSTEM] Scroll failed: {e}")
+            return f"system:scroll_{direction}"
 
         app_names = {"notepad", "calc", "calculator", "cmd", "powershell", "explorer", "chrome", "code", "vscode", "terminal"}
         if t_lower in app_names:
