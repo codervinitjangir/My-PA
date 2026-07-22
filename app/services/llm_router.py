@@ -166,7 +166,8 @@ class LLMRouter:
         """
         Attempts to prime a generator by fetching the first chunk.
         Returns (iterator_with_first_chunk_pre-pended, success_flag).
-        On failure returns (None, False).
+        On failure OR empty stream returns (None, False) — empty streams are treated
+        as failures so the router falls through to the next tier.
         """
         import itertools
         try:
@@ -177,7 +178,9 @@ class LLMRouter:
                 logger.info("[LLM] System prompt size: %d characters / ~%d estimated tokens", prompt_size, prompt_size // 4)
             return itertools.chain([first], gen), True
         except StopIteration:
-            return iter([]), True        # empty but valid stream
+            # Provider returned an empty stream — treat as failure, fall through to next tier
+            logger.warning("[LLM] %s returned empty stream → falling through to next tier", provider_name)
+            return None, False
         except Exception as e:
             logger.warning("[LLM] Stream probe failed (%s): %s", type(e).__name__, str(e)[:120])
             return None, False
