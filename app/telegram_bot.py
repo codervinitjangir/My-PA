@@ -259,16 +259,24 @@ def consume_jarvis_stream(chat_service, session_id, text, imgbase64=None):
                             logger.error(f"[TELEGRAM] Failed to open URL on host PC: {e}")
             if actions.get("desktop_apps"):
                 for app_target in actions["desktop_apps"]:
+                    if app_target.lower() in ("laptop", "pc", "computer", "screen", "system"):
+                        continue
                     try:
                         from config import IS_CLOUD
+                        action_name = "lock_screen" if "lock" in app_target.lower() else "open_app"
+                        payload = {} if action_name == "lock_screen" else {"target": app_target}
                         if IS_CLOUD:
                             from app.websocket_manager import laptop_manager
-                            laptop_manager.send_and_wait(action="open_app", payload={"target": app_target})
+                            laptop_manager.send_and_wait(action=action_name, payload=payload)
                         else:
-                            import os
-                            os.startfile(app_target)
+                            if action_name == "lock_screen":
+                                import ctypes
+                                ctypes.windll.user32.LockWorkStation()
+                            else:
+                                import os
+                                os.startfile(app_target)
                     except Exception as e:
-                        logger.error(f"[TELEGRAM] Failed to open app on host PC: {e}")
+                        logger.error(f"[TELEGRAM] Failed to execute app target '{app_target}' on host PC: {e}")
             if actions.get("images"):
                 links.extend(actions["images"])
                     

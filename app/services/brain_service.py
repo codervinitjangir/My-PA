@@ -414,6 +414,10 @@ class BrainService:
         if "." in q:
             return f"https://{q}" if not q.startswith("http") else q
 
+        # Ignore generic system words
+        if q in ("laptop", "pc", "computer", "screen", "device", "window", "system"):
+            return ""
+
         # If clean single word app name, attempt app launch
         if len(q.split()) == 1 and q.isalnum():
             return f"app:{q}"
