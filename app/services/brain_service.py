@@ -330,6 +330,7 @@ class BrainService:
         from app.services.decision_types import ROUTE_TO_INTENT, INTENT_OPEN
 
         decisions = getattr(self, '_last_task_decisions', [])
+        self._last_task_decisions = []  # Clear after reading so decisions don't bleed into future queries
 
         intents = []
 
@@ -389,6 +390,9 @@ class BrainService:
     def _resolve_open_query(self, query: str) -> str:
         q = query.strip().lower()
 
+        if any(k in q for k in ["lock pc", "lock my pc", "lock screen", "lock laptop", "lock"]):
+            return "system:lock_screen"
+
         if q in self.NATIVE_APPS:
             return f"app:{self.NATIVE_APPS[q]}"
 
@@ -398,7 +402,11 @@ class BrainService:
         if "." in q:
             return f"https://{q}" if not q.startswith("http") else q
 
-        return f"https://www.{q}.com"
+        # If clean app name, check if it's a known executable
+        if len(q.split()) == 1 and q.isalnum():
+            return f"app:{q}"
+
+        return "https://www.google.com"
 
     def _resolve_correction(self, msg: str, chat_history: Optional[List[Tuple[str, str]]] = None) -> str:
 

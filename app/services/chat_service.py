@@ -1086,6 +1086,7 @@ class ChatService:
                     yield {
                         "actions": {
                             "wopens": task_res.wopens,
+                            "desktop_apps": task_res.desktop_apps,
                             "plays": task_res.plays,
                             "googlesearches": task_res.googlesearches,
                             "youtubesearches": task_res.youtubesearches,
