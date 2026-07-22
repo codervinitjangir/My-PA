@@ -445,7 +445,7 @@ def wake_word_thread():
                         if score > 0.2:
                             logger.info("[WAKE] Partial match score: %.2f", score)
                             
-                        if score > 0.45:
+                        if score >= 0.40:
                             now = time.time()
                             global _LAST_WAKE_TIME
                             if now - _LAST_WAKE_TIME < _WAKE_COOLDOWN_SECS:
