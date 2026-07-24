@@ -66,15 +66,19 @@
       "presence_hide": 2
     },
     "2026-07-21": {
-      "presence_open": 7,
+      "presence_open": 8,
       "presence_hide": 1
+    },
+    "2026-07-22": {
+      "presence_open": 13,
+      "presence_hide": 2
     }
   },
   "web_open": 0,
   "web_search": 0,
   "web_summarize": 0,
-  "presence_open": 60,
-  "presence_hide": 17,
+  "presence_open": 74,
+  "presence_hide": 19,
   "presence_brief": 12,
   "presence_dashboard": 5,
   "presence_analyze": 12,

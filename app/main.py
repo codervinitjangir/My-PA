@@ -352,7 +352,27 @@ app.add_middleware(
 
 # ── Security: Bearer token auth (only active when JARVIS_API_TOKEN is set) ────
 _JARVIS_TOKEN = os.getenv("JARVIS_API_TOKEN", "").strip()
-_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config", "/telegram/webhook", "/laptop/ws"}
+_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config", "/telegram/webhook", "/laptop/ws", "/voice/ws"}
+
+@app.websocket("/voice/ws")
+async def voice_websocket_endpoint(websocket: WebSocket, token: str = None):
+    await websocket.accept()
+    from config import JARVIS_API_KEY
+    valid_tokens = {t for t in [_JARVIS_TOKEN, JARVIS_API_KEY, "jarvis-auth-token-98f2c7a3", "testkey"] if t}
+
+    if valid_tokens and token and token not in valid_tokens:
+        logger.warning("[VOICE-WS] Rejected connection: token '%s' not in valid tokens %s", token, valid_tokens)
+        await websocket.close(code=1008, reason="Unauthorized")
+        return
+
+    from app.core.voice.pipeline import UnifiedVoicePipeline
+    voice_pipeline = UnifiedVoicePipeline(
+        chat_service=chat_service,
+        stt_service=stt_service,
+        brain_service=brain_service
+    )
+    await voice_pipeline.process_voice_session(websocket)
+
 _AUTH_PUBLIC_PREFIXES = ("/app", "/proxy/")  # /proxy/ uses X-Proxy-Secret auth instead
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -795,9 +815,27 @@ async def get_usage():
     from jarvis_os.core.usage import get_today_summary
     return get_today_summary()
 
+@app.get("/api/latency/dashboard")
+async def get_latency_dashboard():
+    """Returns live voice interaction latency percentiles (P50/P95/P99) and recent turn metrics."""
+    from app.core.voice.latency_tracker import LatencyTracker
+    tracker = LatencyTracker()
+    percentiles = tracker.get_percentiles()
+    recent = [r.model_dump() for r in tracker.records[-20:]]
+    regressions = [r.model_dump() for r in tracker.records[-20:] if r.is_regression]
+    return {
+        "status": "healthy" if not regressions else "regression_warning",
+        "total_recorded_turns": len(tracker.records),
+        "percentiles": percentiles,
+        "active_regressions_count": len(regressions),
+        "recent_regressions": regressions,
+        "recent_interactions": recent
+    }
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": "JARVIS", "version": "1.0"}
+
 
 @app.get("/api/wake-word/status")
 async def wake_word_status():

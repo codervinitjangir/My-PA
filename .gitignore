@@ -12,3 +12,5 @@ temp_openjarvis/
 # Credentials
 credentials.json
 client_secret_*.json
+*.log
+app/logs/

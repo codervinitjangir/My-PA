@@ -27,14 +27,24 @@ CREDENTIALS_FILE = 'credentials.json'
 TOKEN_FILE = 'database/google_token.json'
 
 def get_google_credentials():
-    creds = None
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
-        
     import logging
     logger = logging.getLogger("J.A.R.V.I.S")
-    if creds:
-        logger.info(f"Google Token exists. Valid: {creds.valid}, Expired: {creds.expired}, Expiry: {creds.expiry}, Has Refresh Token: {bool(creds.refresh_token)}")
+    creds = None
+
+    # First check env var for cloud deployments (e.g. Render)
+    google_token_env = os.getenv("GOOGLE_TOKEN_JSON", "").strip()
+    if google_token_env:
+        try:
+            import json
+            info = json.loads(google_token_env)
+            creds = Credentials.from_authorized_user_info(info, SCOPES)
+            logger.info("Loaded Google credentials from GOOGLE_TOKEN_JSON env var.")
+        except Exception as e:
+            logger.error(f"Failed to load GOOGLE_TOKEN_JSON from env: {e}")
+
+    if not creds and os.path.exists(TOKEN_FILE):
+        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        logger.info(f"Google Token file exists. Valid: {creds.valid}, Expired: {creds.expired}, Expiry: {creds.expiry}, Has Refresh Token: {bool(creds.refresh_token)}")
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:

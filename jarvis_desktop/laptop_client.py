@@ -502,44 +502,49 @@ def wake_word_thread():
             logger.error("[WAKE] InputStream error: %s", e)
             time.sleep(2)
 
+# Persistent In-Memory Audio Player (Phase 1 Optimization)
+try:
+    from jarvis_desktop.audio_player import PersistentAudioPlayer
+    AUDIO_PLAYER = PersistentAudioPlayer()
+    AUDIO_PLAYER.start()
+except Exception:
+    AUDIO_PLAYER = None
+
 def handle_wake_detection():
     beep()
     
     import sounddevice as sd
+    from app.core.voice.vad import AdaptiveVAD
+
     RATE = 16000
     CHANNELS = 1
     FORMAT = np.int16
     MAX_SECS = 5
-    SILENCE_SECS = 1.5
-    SILENCE_THRESHOLD = 500
 
+    vad = AdaptiveVAD(sample_rate=RATE, frame_size=1024, silence_duration_ms=300)
     frames = []
-    silent_chunks = 0
-    chunks_per_sec = RATE / 1024
-    max_silent_chunks = int(SILENCE_SECS * chunks_per_sec)
 
-    logger.info("[WAKE] Recording...")
+    logger.info("[WAKE] Recording (Adaptive VAD 300ms tail active)...")
     
     with sd.InputStream(samplerate=RATE, channels=CHANNELS, dtype=FORMAT, blocksize=1024) as stream:
         silence_start_time = None
-        for _ in range(int(MAX_SECS * chunks_per_sec)):
+        chunks_per_sec = int(RATE / 1024)
+        for _ in range(MAX_SECS * chunks_per_sec):
             data, overflow = stream.read(1024)
             frames.append(data)
-            rms = np.sqrt(np.mean(data.astype(np.float32)**2))
+            pcm_chunk = data.flatten()
             
-            if rms < SILENCE_THRESHOLD:
-                if silent_chunks == 0:
-                    silence_start_time = time.perf_counter()
-                silent_chunks += 1
-            else:
-                silent_chunks = 0
+            vad_res = vad.process_frame(pcm_chunk)
+            if vad_res["is_silent"] and silence_start_time is None:
+                silence_start_time = time.perf_counter()
+            elif not vad_res["is_silent"]:
                 silence_start_time = None
-                
-            if silent_chunks > max_silent_chunks:
-                logger.info("[WAKE] Silence detected, stopping.")
+
+            if vad_res["speech_ended"]:
+                logger.info("[WAKE] Adaptive VAD tail detected silence, stopping recording.")
                 break
 
-    vad_time = int((time.perf_counter() - silence_start_time) * 1000) if silence_start_time else 0
+    vad_time = int((time.perf_counter() - (silence_start_time or time.perf_counter())) * 1000)
     metrics = {"VAD": vad_time, "silence_start_time": silence_start_time or time.perf_counter()}
 
     wav_io = io.BytesIO()
@@ -655,69 +660,50 @@ def handle_wake_detection():
 
 def play_tts(text, metrics=None):
     try:
-        import pygame
-        
-        tts_rtt_start = time.perf_counter()
-        with HTTP_CLIENT.stream("POST", "/tts", json={"text": text}) as r:
-            r.raise_for_status()
-            fd, temp_path = tempfile.mkstemp(suffix=".mp3")
-            first_chunk = True
-            tts_rtt_end = None
-            with os.fdopen(fd, 'wb') as f:
-                for chunk in r.iter_bytes(chunk_size=8192):
-                    if chunk:
-                        if first_chunk and metrics is not None:
-                            tts_first_time = time.perf_counter()
-                            tts_rtt_end = tts_first_time
-                            metrics["TTS_first"] = int((tts_first_time - tts_rtt_start) * 1000)
-                            metrics["_tts_rtt_first"] = metrics["TTS_first"]
-                            
-                            total_time = int((tts_first_time - metrics["silence_start_time"]) * 1000)
-                            metrics["Total"] = total_time
-                            
-                            gap_ms = total_time - (
-                                metrics.get("VAD", 0) +
-                                metrics.get("_stt_rtt", 0) +
-                                metrics.get("_chat_rtt", 0) +
-                                metrics.get("TTS_first", 0)
-                            )
-                            
-                            logger.info("[LATENCY] VAD=%sms STT=%sms Memory=%sms LLM_first=%sms LLM_total=%sms TTS_first=%sms Total=%sms",
-                                metrics.get('VAD'), metrics.get('STT'), metrics.get('Memory'), 
-                                metrics.get('LLM_first'), metrics.get('LLM_total'), 
-                                metrics.get('TTS_first'), metrics.get('Total')
-                            )
-                            logger.info("[NETWORK] stt_roundtrip=%dms chat_roundtrip=%dms tts_first_byte=%dms | unaccounted_gap=%dms",
-                                metrics.get('_stt_rtt', 0),
-                                metrics.get('_chat_rtt', 0),
-                                metrics.get('TTS_first', 0),
-                                gap_ms
-                            )
-                            first_chunk = False
-                        f.write(chunk)
-
-        logger.info("[WAKE] Playing TTS response...")
         global WAKE_WORD_PAUSED
         WAKE_WORD_PAUSED = True
-        try:
+        tts_rtt_start = time.perf_counter()
+        
+        with HTTP_CLIENT.stream("POST", "/tts", json={"text": text}) as r:
+            r.raise_for_status()
+            audio_bytes = bytearray()
+            first_chunk = True
+            for chunk in r.iter_bytes(chunk_size=8192):
+                if chunk:
+                    if first_chunk and metrics is not None:
+                        tts_first_time = time.perf_counter()
+                        metrics["TTS_first"] = int((tts_first_time - tts_rtt_start) * 1000)
+                        total_time = int((tts_first_time - metrics["silence_start_time"]) * 1000)
+                        metrics["Total"] = total_time
+                        logger.info("[LATENCY] VAD=%sms STT=%sms LLM_first=%sms TTS_first=%sms Total=%sms",
+                                    metrics.get('VAD'), metrics.get('STT'), metrics.get('LLM_first'), 
+                                    metrics.get('TTS_first'), metrics.get('Total'))
+                        first_chunk = False
+                    audio_bytes.extend(chunk)
+
+        # In-memory streaming playback fallback (Phase 1 zero disk temp file write)
+        if AUDIO_PLAYER and AUDIO_PLAYER.stream:
+            AUDIO_PLAYER.play_bytes(bytes(audio_bytes))
+        else:
+            import pygame
+            fd, temp_path = tempfile.mkstemp(suffix=".mp3")
+            with os.fdopen(fd, 'wb') as f:
+                f.write(audio_bytes)
             pygame.mixer.init()
             pygame.mixer.music.load(temp_path)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
                 pygame.time.Clock().tick(10)
             pygame.mixer.quit()
-        finally:
-            time.sleep(0.6)  # Give speaker echo time to clear
-            WAKE_WORD_PAUSED = False
-
-        
-        try:
-            os.remove(temp_path)
-        except Exception:
-            pass
-        
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
     except Exception as e:
         logger.error("[WAKE] TTS play failed: %s", e)
+    finally:
+        WAKE_WORD_PAUSED = False
+
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
