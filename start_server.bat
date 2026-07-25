@@ -13,24 +13,12 @@ set PYTHONPATH=%cd%
 :: Start the desktop companion widget in the background
 start /B "" %PYTHON_EXE% -m jarvis_desktop.main
 
-:: Auto-launch laptop companion client if RENDER_URL is set in .env
-:: This bridges your laptop desktop actions to your Render cloud server.
+:: Launch Laptop Companion Client in a separate window if enabled
 for /f "tokens=2 delims==" %%v in ('findstr /i "^RENDER_URL=" .env 2^>nul') do set RENDER_URL_VAL=%%v
-if defined RENDER_URL_VAL (
-    if not "%RENDER_URL_VAL%"=="" (
-        echo.
-        echo [INFO] RENDER_URL detected — launching Laptop Companion Client...
-        echo [INFO] Your laptop will bridge desktop commands to Render.
-        start "JARVIS Laptop Client" %PYTHON_EXE% -m jarvis_desktop.laptop_client
-        echo.
-        echo [INFO] Laptop Client mode active. Backend will not start locally.
-        echo [INFO] Close this window when you are done.
-        pause
-        exit /b
-    )
-)
+echo [INFO] Launching JARVIS Laptop Client...
+start "JARVIS Laptop Client" %PYTHON_EXE% -m jarvis_desktop.laptop_client
 
-:: Start the main backend
-echo [INFO] Starting JARVIS backend server...
+:: Start the main local backend server
+echo [INFO] Starting JARVIS local backend server (http://127.0.0.1:8000)...
 %PYTHON_EXE% run.py
 pause
