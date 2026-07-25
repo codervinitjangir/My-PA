@@ -39,24 +39,27 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
-RENDER_URL = os.getenv("RENDER_URL", "").rstrip("/")
+RENDER_URL = os.getenv("RENDER_URL", "https://jarvis-mcaj.onrender.com").rstrip("/")
 API_TOKEN  = os.getenv("JARVIS_API_TOKEN", "")
 API_KEY    = os.getenv("JARVIS_API_KEY", "")
 WAKE_WORD_ENABLED = os.getenv("JARVIS_WAKE_WORD_ENABLED", "true").lower() == "true"
 
-if not RENDER_URL:
-    print("[ERROR] RENDER_URL is not set in your .env file.")
-    print("  Add: RENDER_URL=https://your-app.onrender.com")
-    sys.exit(1)
+# Auto-detect if local JARVIS backend is running on 127.0.0.1:8000 for instant sub-300ms execution
+SERVER_URL = RENDER_URL
+try:
+    with httpx.Client(timeout=1.0) as test_client:
+        test_res = test_client.get("http://127.0.0.1:8000/health")
+        if test_res.status_code == 200:
+            SERVER_URL = "http://127.0.0.1:8000"
+            print("[INFO] Connected to LOCAL backend (http://127.0.0.1:8000) for fast execution!")
+except Exception:
+    print(f"[INFO] Using remote backend server: {RENDER_URL}")
 
 # Build WebSocket URL
-WS_URL = RENDER_URL.replace("https://", "wss://").replace("http://", "ws://") + "/laptop/ws"
+WS_URL = SERVER_URL.replace("https://", "wss://").replace("http://", "ws://") + "/laptop/ws"
 if API_TOKEN:
     WS_URL += f"?token={API_TOKEN}"
 
-# Build Auth Headers for HTTP Requests
-# Send BOTH tokens: AuthMiddleware checks Bearer, /chat checks X-API-Key.
-# Use API_KEY as Bearer fallback if API_TOKEN doesn't match the server's value.
 _bearer = API_TOKEN or API_KEY
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -69,13 +72,10 @@ if API_KEY:
 RECONNECT_DELAY_INITIAL = 5
 RECONNECT_DELAY_MAX     = 60
 
-# Backend chat API requires a strict UUID4 session ID
 CLIENT_SESSION_ID = str(uuid.uuid4())
 
-# Persistent HTTP client — reuses TCP connections across all STT/chat/TTS calls
-# This avoids a fresh TCP+TLS handshake on every voice interaction
 HTTP_CLIENT = httpx.Client(
-    base_url=RENDER_URL,
+    base_url=SERVER_URL,
     headers=HEADERS,
     timeout=httpx.Timeout(connect=10.0, read=45.0, write=45.0, pool=10.0),
     follow_redirects=True,
@@ -480,7 +480,7 @@ def wake_word_thread():
                         if score > 0.2:
                             logger.info("[WAKE] Partial match score: %.2f", score)
                             
-                        if score >= 0.42:
+                        if score >= 0.58:
                             now = time.time()
                             global _LAST_WAKE_TIME
                             if now - _LAST_WAKE_TIME < _WAKE_COOLDOWN_SECS:
@@ -584,6 +584,15 @@ def handle_wake_detection():
             return
         logger.info("[WAKE] Recognized (raw): %s", text)
 
+        # Self-Echo Suppressor: if recognized text matches JARVIS's own last spoken reply, drop it!
+        global LAST_JARVIS_REPLY_TEXT
+        if LAST_JARVIS_REPLY_TEXT and (
+            text.lower() in LAST_JARVIS_REPLY_TEXT.lower() or
+            LAST_JARVIS_REPLY_TEXT.lower() in text.lower()
+        ):
+            logger.info("[WAKE] Suppressed self-listening speaker echo: '%s'", text)
+            return
+
         # Strip wake word prefix so "Hey Jarvis, open YouTube" → "open YouTube"
         import re as _re
         text = _re.sub(
@@ -619,6 +628,9 @@ def handle_wake_detection():
         
         reply_text = chat_resp.get("response", "").strip()
         logger.info("[WAKE] JARVIS replied: %s", reply_text)
+        
+        global LAST_JARVIS_REPLY_TEXT
+        LAST_JARVIS_REPLY_TEXT = reply_text
         
         # --- Auto-Open URLs & Apps ---
         import re
@@ -681,27 +693,36 @@ def play_tts(text, metrics=None):
                         first_chunk = False
                     audio_bytes.extend(chunk)
 
-        # In-memory streaming playback fallback (Phase 1 zero disk temp file write)
-        if AUDIO_PLAYER and AUDIO_PLAYER.stream:
-            AUDIO_PLAYER.play_bytes(bytes(audio_bytes))
-        else:
-            import pygame
-            fd, temp_path = tempfile.mkstemp(suffix=".mp3")
+        # PyGame MP3 Playback (Blocking — ensures wake word stays PAUSED during full speaker output)
+        import pygame
+        fd, temp_path = tempfile.mkstemp(suffix=".mp3")
+        try:
             with os.fdopen(fd, 'wb') as f:
                 f.write(audio_bytes)
             pygame.mixer.init()
             pygame.mixer.music.load(temp_path)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
-                pygame.time.Clock().tick(10)
+                pygame.time.Clock().tick(20)
             pygame.mixer.quit()
+        finally:
             try:
                 os.remove(temp_path)
             except Exception:
                 pass
+
+        # Post-playback echo decay window to prevent room echo triggering false wake word
+        time.sleep(0.6)
+
     except Exception as e:
         logger.error("[WAKE] TTS play failed: %s", e)
     finally:
+        # Flush queue so audio recorded during TTS isn't processed
+        try:
+            while not audio_queue.empty():
+                audio_queue.get_nowait()
+        except Exception:
+            pass
         WAKE_WORD_PAUSED = False
 
 
