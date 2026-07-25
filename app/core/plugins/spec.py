@@ -36,6 +36,10 @@ class PluginV1Spec:
         else:
             raise ValueError("Plugin metadata must be a dictionary or PluginMetadata instance.")
 
+        # Name must not be empty — required for logging, auditing, and debugging
+        if not metadata.name or not metadata.name.strip():
+            raise ValueError("Plugin 'name' must be a non-empty string.")
+
         # API Version compatibility check
         major_target = metadata.api_version.split(".")[0]
         major_current = CURRENT_PLUGIN_API_VERSION.split(".")[0]
