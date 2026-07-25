@@ -461,10 +461,18 @@ class ChatService:
 
         finally:
             final_response = self.sessions[session_id][-1].content
+            total_ms = int((time.perf_counter() - t0) * 1000)
             logger.info(
-                "[GENERAL-STREAM] Completed | Chunks: %d | Response length: %d chars",
-                chunk_count, 
-                len(final_response)
+                "\n"
+                "┌────────────────────────────────────────────────────────┐\n"
+                "│ ⚡ JARVIS RESPONSE LATENCY SUMMARY                    │\n"
+                "├────────────────────────────────────────────────────────┤\n"
+                f"│ • Route           : GENERAL STREAMING                   │\n"
+                f"│ • Time-to-1st-Tok : {elapsed_ms if 'elapsed_ms' in locals() else 'N/A'} ms                             │\n"
+                f"│ • Total Stream    : {total_ms} ms                             │\n"
+                f"│ • Chunks Yielded  : {chunk_count:<34} │\n"
+                f"│ • Response Length : {len(final_response):<34} │\n"
+                "└────────────────────────────────────────────────────────┘"
             )
             self.save_chat_session(session_id)
             self.update_vector_store_live(session_id)

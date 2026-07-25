@@ -178,6 +178,7 @@ class TTSPlayer {
             return;
         }
         this.playing = false;
+        lastTTSEndTime = Date.now();
         if (ttsBtn) ttsBtn.classList.remove('tts-speaking');
         if (orbContainer) orbContainer.classList.remove('speaking');
         if (orb) orb.setActive(false);
@@ -389,11 +390,30 @@ async function startListening() {
 }
 
 let isSpeaking = false;
+let lastTTSEndTime = 0;
+let lastTTSSpokenText = "";
+
+function showLatencyBadge(contentEl, elapsedMs, sttMs = null) {
+    if (!contentEl) return;
+    const msgBody = contentEl.closest('.msg-body');
+    if (!msgBody) return;
+    
+    let badge = msgBody.querySelector('.msg-latency');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'msg-latency';
+        msgBody.appendChild(badge);
+    }
+    
+    const totalSec = (elapsedMs / 1000).toFixed(2);
+    const sttStr = sttMs != null ? `STT ${sttMs}ms · ` : '';
+    badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> ${sttStr}TTFA ${elapsedMs}ms (${totalSec}s total)`;
+}
 
 function monitorVAD() {
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
     
-        const checkSilence = () => {
+    const checkSilence = () => {
         if (!isListening) return;
         
         analyser.getByteFrequencyData(dataArray);
@@ -401,13 +421,27 @@ function monitorVAD() {
         for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
         let average = sum / dataArray.length;
         
-        const VOLUME_THRESHOLD = 3; // Lowered from 15 to be more sensitive
+        // Dynamic threshold to eliminate self-voice echo / feedback loop:
+        // 1. Active TTS playing -> high threshold (35) requiring loud user voice for barge-in
+        // 2. Echo decay window (<600ms after TTS) -> medium threshold (20)
+        // 3. Normal quiet state -> threshold (10)
+        const ttsActive = ttsPlayer && (ttsPlayer.playing || ttsPlayer.queue.length > 0);
+        const timeSinceTTS = Date.now() - lastTTSEndTime;
+        
+        let VOLUME_THRESHOLD = 10;
+        if (ttsActive) {
+            VOLUME_THRESHOLD = 35;
+        } else if (timeSinceTTS < 600) {
+            VOLUME_THRESHOLD = 20;
+        }
         
         if (average > VOLUME_THRESHOLD) {
             if (!isSpeaking) {
                 isSpeaking = true;
                 if (speechWidgetText) speechWidgetText.textContent = 'Hearing you...';
-                if (settings.voiceInterrupt && ttsPlayer && ttsPlayer.playing) {
+                if (settings.voiceInterrupt && ttsActive) {
+                    // Real user barge-in! Discard recorded speaker chunks before user spoke
+                    audioChunks = [];
                     ttsPlayer.stop();
                     ttsPlayer.stopped = false;
                 }
@@ -424,7 +458,7 @@ function monitorVAD() {
                         mediaRecorder.stop();
                     }
                     stopListeningInternal();
-                }, 2500); // Increased to 2500ms for better reliability
+                }, 1500); // 1.5s silence cutoff for tight responsive turns
             }
         }
         vadRAF = requestAnimationFrame(checkSilence);
@@ -469,11 +503,13 @@ function maybeRestartListening() {
     if (isStreaming) return;
 
     const ttsActive = ttsPlayer && (ttsPlayer.playing || ttsPlayer.queue.length > 0);
-    if (ttsActive && !settings.voiceInterrupt) return;
+    // Never restart listening while TTS audio is actively playing out of speakers
+    if (ttsActive) return;
 
-    const delay = ttsActive ? 150 : SPEECH_RESTART_DELAY_MS;
+    const delay = SPEECH_RESTART_DELAY_MS + 300; // Allow speaker echo to settle
     setTimeout(() => {
-        if (autoListenMode && !isStreaming && !isListening) {
+        const stillTtsActive = ttsPlayer && (ttsPlayer.playing || ttsPlayer.queue.length > 0);
+        if (autoListenMode && !isStreaming && !isListening && !stillTtsActive) {
             startListening();
         }
     }, delay);
@@ -485,8 +521,8 @@ async function processSTT(blob) {
     
     const formData = new FormData();
     formData.append('file', blob, 'audio.webm');
-    // Language is omitted so Whisper can auto-detect (allows Hindi/Hinglish)
     
+    const startTime = performance.now();
     try {
         const res = await fetch(`${API}/stt`, {
             method: 'POST',
@@ -495,9 +531,23 @@ async function processSTT(blob) {
         
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        const sttMs = Math.round(performance.now() - startTime);
         
         if (data.text && data.text.trim()) {
-            sendMessage(data.text.trim());
+            const cleanText = data.text.trim();
+            // Self-echo filter: if STT transcribed JARVIS's own recent output, ignore it
+            if (lastTTSSpokenText && (
+                cleanText.toLowerCase().includes(lastTTSSpokenText.toLowerCase().slice(0, 30)) ||
+                lastTTSSpokenText.toLowerCase().includes(cleanText.toLowerCase())
+            )) {
+                console.info('[STT Filter] Ignored self-listening echo:', cleanText);
+                if (speechWidgetText) speechWidgetText.textContent = 'Ignored speaker echo.';
+                setTimeout(() => {
+                    if (speechWidget && !isListening) speechWidget.classList.remove('visible');
+                }, 1200);
+                return;
+            }
+            sendMessage(cleanText, sttMs);
         } else {
             if (speechWidgetText) speechWidgetText.textContent = 'Could not hear clearly.';
             setTimeout(() => {
@@ -1429,7 +1479,7 @@ function scrollToBottom() {
     });
 }
 
-async function sendMessage(textOverride) {
+async function sendMessage(textOverride, sttMs = null) {
     let text = (textOverride || messageInput.value).trim();
     const visionModeOn = camVisionModeInput && camVisionModeInput.checked;
     const wantsCamera = visionModeOn || isCameraQuery(text) || (camStream && text);
@@ -1465,6 +1515,7 @@ async function sendMessage(textOverride) {
     addMessage('user', text);
     addTypingIndicator();
     isStreaming = true;
+    const sendStartTime = performance.now();
     if (sendBtn) sendBtn.disabled = true;
     if (messageInput) messageInput.disabled = true;
     if (orbContainer) orbContainer.classList.add('active');
@@ -1529,6 +1580,9 @@ async function sendMessage(textOverride) {
                         appendActivity(data.activity);
                         if (activityToggle) activityToggle.style.display = '';
                         if (activityPanel && settings.autoOpenActivity) { activityPanel.classList.add('open'); updatePanelOverlay(); }
+                        if (data.activity.event === 'first_chunk' || data.activity.elapsed_ms) {
+                            showLatencyBadge(contentEl, data.activity.elapsed_ms || Math.round(performance.now() - sendStartTime), sttMs);
+                        }
                     }
                     if (data.search_results) {
                         renderSearchResults(data.search_results);
@@ -1546,6 +1600,7 @@ async function sendMessage(textOverride) {
                         if (chunkText && !firstChunkReceived) {
                             firstChunkReceived = true;
                             if (ttsPlayer) ttsPlayer.reset();
+                            showLatencyBadge(contentEl, Math.round(performance.now() - sendStartTime), sttMs);
                         }
                         fullResponse += chunkText;
                         const textSpan = contentEl.querySelector('.msg-stream-text');
@@ -1576,6 +1631,7 @@ async function sendMessage(textOverride) {
         if (cursorEl) cursorEl.remove();
         const textSpan = contentEl.querySelector('.msg-stream-text');
         if (textSpan && !fullResponse) textSpan.textContent = '(No response)';
+        if (fullResponse) lastTTSSpokenText = fullResponse.slice(0, 100);
     } catch (err) {
         clearTimeout(timeoutId);
         removeTypingIndicator();
