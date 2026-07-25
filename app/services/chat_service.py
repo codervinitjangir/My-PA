@@ -443,6 +443,7 @@ class ChatService:
 
                 if chunk_count == 0:
                     elapsed_ms = int((time.perf_counter() - t0) * 1000)
+                    self.last_metrics.setdefault(session_id, {})["LLM_first"] = elapsed_ms
                     yield {
                         "_activity": {
                             "event": "first_chunk", 
@@ -462,6 +463,7 @@ class ChatService:
         finally:
             final_response = self.sessions[session_id][-1].content
             total_ms = int((time.perf_counter() - t0) * 1000)
+            self.last_metrics.setdefault(session_id, {})["LLM_total"] = total_ms
             logger.info(
                 "\n"
                 "┌────────────────────────────────────────────────────────┐\n"
@@ -1111,6 +1113,7 @@ class ChatService:
 
                 if chunk_count == 0:
                     elapsed_ms = int((time.perf_counter() - t0) * 1000)
+                    self.last_metrics.setdefault(session_id, {})["LLM_first"] = elapsed_ms
                     yield {
                         "_activity": {
                             "event": "first_chunk", 
@@ -1143,11 +1146,14 @@ class ChatService:
 
         finally:
             final_response = self.sessions[session_id][-1].content
+            total_llm_ms = int((time.perf_counter() - t0) * 1000)
+            self.last_metrics.setdefault(session_id, {})["LLM_total"] = total_llm_ms
             logger.info(
-                "[JARVIS-STREAM] Completed | Route: %s | Chunks: %d | Response length: %d chars",
+                "[JARVIS-STREAM] Completed | Route: %s | Chunks: %d | Response length: %d chars | LLM time: %dms",
                 query_type, 
                 chunk_count, 
-                len(final_response)
+                len(final_response),
+                total_llm_ms
             )
             self.save_chat_session(session_id)
             self.update_vector_store_live(session_id)

@@ -674,6 +674,9 @@ def play_tts(text, metrics=None):
     try:
         global WAKE_WORD_PAUSED
         WAKE_WORD_PAUSED = True
+        logger.info("[AUDIO-PIPELINE] Suspending wake detection during TTS output...")
+        logger.info("[AUDIO-PIPELINE] Sending HTTP POST /tts request for text: '%s'", text[:60])
+        
         tts_rtt_start = time.perf_counter()
         
         with HTTP_CLIENT.stream("POST", "/tts", json={"text": text}) as r:
@@ -693,37 +696,53 @@ def play_tts(text, metrics=None):
                         first_chunk = False
                     audio_bytes.extend(chunk)
 
-        # PyGame MP3 Playback (Blocking — ensures wake word stays PAUSED during full speaker output)
+        logger.info("[AUDIO-PIPELINE] HTTP 200 OK received from /tts (Received %d bytes)", len(audio_bytes))
+
+        if not audio_bytes:
+            logger.warning("[AUDIO-PIPELINE] Received empty audio bytes payload from /tts")
+            return
+
         import pygame
         fd, temp_path = tempfile.mkstemp(suffix=".mp3")
         try:
             with os.fdopen(fd, 'wb') as f:
                 f.write(audio_bytes)
-            pygame.mixer.init()
+            logger.info("[AUDIO-PIPELINE] Temporary MP3 written: %s (%d bytes)", temp_path, len(audio_bytes))
+            
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+                logger.info("[AUDIO-PIPELINE] PyGame audio mixer initialized.")
+            
             pygame.mixer.music.load(temp_path)
+            playback_start = time.perf_counter()
+            logger.info("[AUDIO-PIPELINE] Starting speaker playback...")
             pygame.mixer.music.play()
+            
             while pygame.mixer.music.get_busy():
                 pygame.time.Clock().tick(20)
-            pygame.mixer.quit()
+                
+            playback_duration = time.perf_counter() - playback_start
+            logger.info("[AUDIO-PIPELINE] Playback completed cleanly in %.2fs.", playback_duration)
         finally:
             try:
                 os.remove(temp_path)
-            except Exception:
-                pass
+                logger.info("[AUDIO-PIPELINE] Temporary audio file removed.")
+            except Exception as e:
+                logger.warning("[AUDIO-PIPELINE] Failed to remove temp audio file: %s", e)
 
-        # Post-playback echo decay window to prevent room echo triggering false wake word
+        logger.info("[AUDIO-PIPELINE] Post-playback echo decay window active (0.6s)...")
         time.sleep(0.6)
 
     except Exception as e:
-        logger.error("[WAKE] TTS play failed: %s", e)
+        logger.error("[AUDIO-PIPELINE] Audio playback error: %s", e, exc_info=True)
     finally:
-        # Flush queue so audio recorded during TTS isn't processed
         try:
             while not audio_queue.empty():
                 audio_queue.get_nowait()
         except Exception:
             pass
         WAKE_WORD_PAUSED = False
+        logger.info("[AUDIO-PIPELINE] Wake detection resumed.")
 
 
 
