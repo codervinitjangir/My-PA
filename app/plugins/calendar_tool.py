@@ -45,35 +45,61 @@ def get_google_credentials():
     if not creds and os.path.exists(TOKEN_FILE):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
         logger.info(f"Google Token file exists. Valid: {creds.valid}, Expired: {creds.expired}, Expiry: {creds.expiry}, Has Refresh Token: {bool(creds.refresh_token)}")
+
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
+                # Save refreshed token back to disk
+                os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
+                with open(TOKEN_FILE, 'w') as token:
+                    token.write(creds.to_json())
+                logger.info("Google token refreshed and saved successfully.")
+                return creds
             except Exception as e:
                 logger.error(f"Token refresh failed: {e}", exc_info=True)
-                print(f"Token refresh failed: {e}. Re-authenticating...")
+                # Token is broken — clear it so we don't loop
                 if os.path.exists(TOKEN_FILE):
                     os.remove(TOKEN_FILE)
-                if not os.path.exists(CREDENTIALS_FILE):
-                    raise FileNotFoundError(
-                        f"{CREDENTIALS_FILE} not found. Please follow the Google Cloud Setup Instructions "
-                        "at the top of app/plugins/calendar_tool.py."
-                    )
-                flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-                creds = flow.run_local_server(port=8080)
-        else:
-            if not os.path.exists(CREDENTIALS_FILE):
-                raise FileNotFoundError(
-                    f"{CREDENTIALS_FILE} not found. Please follow the Google Cloud Setup Instructions "
-                    "at the top of app/plugins/calendar_tool.py."
-                )
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_local_server(port=8080)
-        
+                creds = None
+
+        # Need fresh auth — check if browser is available
+        _require_browser_auth()
+
+        if not os.path.exists(CREDENTIALS_FILE):
+            raise FileNotFoundError(
+                f"{CREDENTIALS_FILE} not found. Please follow the Google Cloud Setup Instructions "
+                "at the top of app/plugins/calendar_tool.py."
+            )
+        flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+        creds = flow.run_local_server(port=8080)
         os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
         with open(TOKEN_FILE, 'w') as token:
             token.write(creds.to_json())
+
     return creds
+
+
+def _require_browser_auth():
+    """Raise a clear error if we're in a headless/server environment with no browser."""
+    import sys
+    import logging
+    logger = logging.getLogger("J.A.R.V.I.S")
+    is_headless = (
+        (os.getenv("DISPLAY") is None and sys.platform != "win32")
+        or os.getenv("RENDER") is not None
+        or os.getenv("HEADLESS_MODE") is not None
+    )
+    if is_headless:
+        msg = (
+            "Google OAuth re-authentication required but no browser is available on this server.\n"
+            "Fix: Run the following on your LOCAL machine to get a fresh token:\n"
+            "  python tools/refresh_google_token.py\n"
+            "Then base64-encode it and update GOOGLE_TOKEN_B64 on Render:\n"
+            "  python -c \"import base64; print(base64.b64encode(open('database/google_token.json','rb').read()).decode())\""
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
 
 class GoogleCalendarTool(BaseTool):
     name: str = "google_calendar"
