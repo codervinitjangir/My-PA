@@ -1,4 +1,5 @@
 /* jarvis_desktop/app/styles/jarvis.qss */
+/* Sci-Fi HUD aesthetic — cyan primary accent, deep navy background, purple CTA accent */
 
 /* Overall Window & Root Background */
 QMainWindow, QWidget#rootWindow {
@@ -9,34 +10,35 @@ QMainWindow, QWidget#rootWindow {
 
 /* Glassmorphism Panel Styling */
 .GlassPanel, QFrame#glassPanel {
-    background-color: rgba(10, 10, 28, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(10, 14, 30, 0.75);
+    border: 1px solid rgba(0, 217, 255, 0.10);
     border-radius: 16px;
 }
 
-/* Top Header Bar */
+/* Top Header Bar — cyan bottom accent line */
 QFrame#headerBar {
-    background-color: rgba(10, 10, 28, 0.72);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background-color: rgba(8, 12, 28, 0.92);
+    border-bottom: 1px solid rgba(0, 217, 255, 0.22);
     border-radius: 0px;
 }
 
 QLabel#logoLabel {
     font-size: 20px;
     font-weight: 700;
-    color: #7c6aef;
-    letter-spacing: 1px;
+    color: #00D9FF;
+    letter-spacing: 2px;
 }
 
 QLabel#taglineLabel {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(0, 217, 255, 0.35);
+    letter-spacing: 0.5px;
 }
 
 /* Mode Switcher Container & Buttons */
 QFrame#modeSwitcher {
-    background-color: rgba(5, 5, 18, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(5, 5, 18, 0.90);
+    border: 1px solid rgba(0, 217, 255, 0.12);
     border-radius: 12px;
     padding: 3px;
 }
@@ -52,8 +54,8 @@ QPushButton.modeBtn {
 }
 
 QPushButton.modeBtn:hover {
-    color: #ffffff;
-    background-color: rgba(255, 255, 255, 0.06);
+    color: #00D9FF;
+    background-color: rgba(0, 217, 255, 0.07);
 }
 
 QPushButton.modeBtn[active="true"] {
@@ -64,23 +66,24 @@ QPushButton.modeBtn[active="true"] {
 
 /* Status Badge */
 QFrame#statusBadge {
-    background-color: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(0, 217, 255, 0.04);
+    border: 1px solid rgba(0, 217, 255, 0.14);
     border-radius: 14px;
     padding: 4px 10px;
 }
 
 QLabel#statusText {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 600;
 }
 
 /* Icon Buttons Header */
 QPushButton.headerIconBtn {
-    background-color: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(0, 217, 255, 0.04);
+    border: 1px solid rgba(0, 217, 255, 0.10);
     border-radius: 10px;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.80);
     min-width: 36px;
     max-width: 36px;
     min-height: 36px;
@@ -89,15 +92,15 @@ QPushButton.headerIconBtn {
 }
 
 QPushButton.headerIconBtn:hover {
-    background-color: rgba(255, 255, 255, 0.12);
-    border-color: rgba(124, 106, 239, 0.4);
-    color: #ffffff;
+    background-color: rgba(0, 217, 255, 0.10);
+    border-color: rgba(0, 217, 255, 0.40);
+    color: #00D9FF;
 }
 
 /* Activity Sidebar Panel */
 QFrame#sidebarPanel {
-    background-color: rgba(10, 10, 28, 0.85);
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    background-color: rgba(8, 12, 28, 0.92);
+    border-right: 1px solid rgba(0, 217, 255, 0.10);
     border-radius: 0px;
 }
 
@@ -109,39 +112,40 @@ QLabel#sidebarTitle {
 
 /* Timeline Flow Card */
 QFrame.timelineCard {
-    background-color: rgba(18, 18, 42, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background-color: rgba(10, 22, 40, 0.75);
+    border: 1px solid rgba(0, 217, 255, 0.08);
     border-radius: 12px;
     padding: 10px;
 }
 
 QLabel.stepBadge {
-    background-color: #2b1f54;
-    color: #7c6aef;
+    background-color: rgba(0, 217, 255, 0.08);
+    color: #00D9FF;
     border-radius: 4px;
     padding: 2px 6px;
     font-size: 11px;
     font-weight: 700;
 }
 
-/* Command Center Grid */
+/* Command Center Grid — cyan border-bottom accent */
 QFrame#commandCenterCard {
-    background-color: rgba(12, 12, 32, 0.7);
-    border: 1px solid rgba(124, 106, 239, 0.25);
+    background-color: rgba(8, 12, 30, 0.78);
+    border: 1px solid rgba(0, 217, 255, 0.18);
+    border-bottom: 2px solid rgba(0, 217, 255, 0.32);
     border-radius: 16px;
     padding: 16px;
 }
 
 QLabel#commandCenterHeader {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    color: #7c6aef;
-    letter-spacing: 1px;
+    color: #00D9FF;
+    letter-spacing: 1.5px;
 }
 
 QPushButton.cmdBtn {
-    background-color: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(0, 217, 255, 0.03);
+    border: 1px solid rgba(0, 217, 255, 0.10);
     border-radius: 10px;
     color: #ffffff;
     padding: 10px 14px;
@@ -151,16 +155,30 @@ QPushButton.cmdBtn {
 }
 
 QPushButton.cmdBtn:hover {
-    background-color: rgba(124, 106, 239, 0.15);
-    border-color: #7c6aef;
+    background-color: rgba(0, 217, 255, 0.10);
+    border-color: #00D9FF;
+    color: #00D9FF;
+}
+
+/* Metric Card (Today's Usage) — cyan border-bottom accent */
+QFrame#metricCard {
+    background-color: rgba(8, 14, 32, 0.78);
+    border: 1px solid rgba(0, 217, 255, 0.12);
+    border-bottom: 2px solid rgba(0, 217, 255, 0.25);
+    border-radius: 16px;
+    padding: 14px;
 }
 
 /* Chat Input Bar */
 QFrame#inputBar {
-    background-color: rgba(10, 10, 28, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(8, 12, 28, 0.90);
+    border: 1px solid rgba(0, 217, 255, 0.12);
     border-radius: 20px;
     padding: 8px 14px;
+}
+
+QFrame#inputBar:focus-within {
+    border-color: rgba(0, 217, 255, 0.40);
 }
 
 QTextEdit#messageInput {
@@ -172,10 +190,10 @@ QTextEdit#messageInput {
 }
 
 QPushButton.inputActionBtn {
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(0, 217, 255, 0.05);
+    border: 1px solid rgba(0, 217, 255, 0.10);
     border-radius: 18px;
-    color: #ffffff;
+    color: rgba(255, 255, 255, 0.85);
     min-width: 36px;
     max-width: 36px;
     min-height: 36px;
@@ -184,9 +202,12 @@ QPushButton.inputActionBtn {
 }
 
 QPushButton.inputActionBtn:hover {
-    background-color: rgba(255, 255, 255, 0.12);
+    background-color: rgba(0, 217, 255, 0.14);
+    border-color: #00D9FF;
+    color: #00D9FF;
 }
 
+/* Send button stays purple — clear CTA hierarchy */
 QPushButton#sendBtn {
     background-color: #7c6aef;
     border: none;
@@ -203,22 +224,22 @@ QPushButton#sendBtn:hover {
     background-color: #6956e6;
 }
 
-/* Scrollbars */
+/* Scrollbars — cyan glow on hover */
 QScrollBar:vertical {
     border: none;
-    background: rgba(0, 0, 0, 0.2);
-    width: 6px;
-    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.15);
+    width: 5px;
+    border-radius: 2px;
 }
 
 QScrollBar::handle:vertical {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 3px;
+    background: rgba(0, 217, 255, 0.18);
+    border-radius: 2px;
     min-height: 20px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background: #7c6aef;
+    background: #00D9FF;
 }
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
@@ -227,7 +248,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 
 /* Dialog / Overlay Settings */
 QDialog#settingsDialog {
-    background-color: rgba(10, 10, 28, 0.95);
-    border: 1px solid rgba(124, 106, 239, 0.3);
+    background-color: rgba(8, 12, 28, 0.96);
+    border: 1px solid rgba(0, 217, 255, 0.22);
     border-radius: 20px;
 }

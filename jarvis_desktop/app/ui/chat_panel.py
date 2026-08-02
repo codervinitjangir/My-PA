@@ -10,20 +10,77 @@ from jarvis_desktop.app.widgets.chat_bubble import ChatBubble
 
 class ChatPanel(QFrame):
     """
-    Main Chat stream container with scrollable message list and interactive Welcome screen with prompt chips.
+    Transcript session panel for Classified AI workstation layout.
+    Features header session toolbar (SESSION - GENERAL, Search, Settings, Clear)
+    and clean scrollable message stream with timestamps & tool execution badges.
     """
     chip_clicked = Signal(str)
+    clear_requested = Signal()
+    settings_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("chatPanel")
-        self.setStyleSheet("background: transparent; border: none;")
+        self.setStyleSheet("""
+            QFrame#chatPanel {
+                background-color: rgba(6, 10, 22, 0.92);
+                border-left: 1px solid rgba(0, 217, 255, 0.12);
+            }
+        """)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Scroll Area for Messages
+        # ── 1. Session Top Header Bar ─────────────────────────────────────────
+        session_header = QFrame(self)
+        session_header.setStyleSheet("""
+            QFrame {
+                background-color: rgba(4, 8, 18, 0.95);
+                border-bottom: 1px solid rgba(0, 217, 255, 0.12);
+                padding: 6px 12px;
+            }
+        """)
+        h_layout = QHBoxLayout(session_header)
+        h_layout.setContentsMargins(10, 6, 10, 6)
+        h_layout.setSpacing(8)
+
+        s_title = QLabel("SESSION - GENERAL", session_header)
+        s_title.setStyleSheet("font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.4); letter-spacing: 1.2px;")
+        h_layout.addWidget(s_title)
+
+        h_layout.addStretch()
+
+        self.btn_search = QPushButton("🔍 SEARCH", session_header)
+        self.btn_settings = QPushButton("⚙ SETTINGS", session_header)
+        self.btn_clear = QPushButton("🗑 CLEAR", session_header)
+
+        for btn in [self.btn_search, self.btn_settings, self.btn_clear]:
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.04);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 6px;
+                    color: rgba(255, 255, 255, 0.7);
+                    font-size: 10px;
+                    font-weight: 600;
+                    padding: 4px 8px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 229, 204, 0.12);
+                    border-color: #00E5CC;
+                    color: #00E5CC;
+                }
+            """)
+            h_layout.addWidget(btn)
+
+        self.btn_clear.clicked.connect(self.clear_messages)
+        self.btn_settings.clicked.connect(self.settings_requested.emit)
+
+        main_layout.addWidget(session_header)
+
+        # ── 2. Scroll Area for Message Transcript ────────────────────────────
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.NoFrame)
@@ -33,31 +90,23 @@ class ChatPanel(QFrame):
         self.scroll_content.setStyleSheet("background: transparent;")
         
         self.messages_layout = QVBoxLayout(self.scroll_content)
-        self.messages_layout.setContentsMargins(20, 20, 20, 20)
-        self.messages_layout.setSpacing(16)
+        self.messages_layout.setContentsMargins(12, 12, 12, 12)
+        self.messages_layout.setSpacing(10)
 
-        # Welcome Screen Widget
+        # Welcome Prompt Chips Widget (visible when empty)
         self.welcome_widget = QWidget(self.scroll_content)
         welcome_layout = QVBoxLayout(self.welcome_widget)
         welcome_layout.setAlignment(Qt.AlignCenter)
-        welcome_layout.setSpacing(10)
+        welcome_layout.setSpacing(8)
 
-        welcome_icon = QLabel("🤖", self.welcome_widget)
-        welcome_icon.setStyleSheet("font-size: 42px; color: #7c6aef;")
-        welcome_icon.setAlignment(Qt.AlignCenter)
+        welcome_title = QLabel("JARVIS WORKSTATION ACTIVE", self.welcome_widget)
+        welcome_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #00E5CC; letter-spacing: 1.5px;")
+        welcome_sub = QLabel("Select a quick prompt or type a command to begin:", self.welcome_widget)
+        welcome_sub.setStyleSheet("font-size: 11px; color: rgba(255, 255, 255, 0.4);")
 
-        self.welcome_title = QLabel("Good evening.", self.welcome_widget)
-        self.welcome_title.setStyleSheet("font-size: 24px; font-weight: 700; color: #ffffff;")
-        self.welcome_title.setAlignment(Qt.AlignCenter)
-
-        welcome_sub = QLabel("How may I assist you today?", self.welcome_widget)
-        welcome_sub.setStyleSheet("font-size: 14px; color: rgba(255, 255, 255, 0.5);")
-        welcome_sub.setAlignment(Qt.AlignCenter)
-
-        # Welcome Chips
         chips_container = QWidget(self.welcome_widget)
         chips_layout = QHBoxLayout(chips_container)
-        chips_layout.setSpacing(10)
+        chips_layout.setSpacing(6)
         chips_layout.setAlignment(Qt.AlignCenter)
 
         chip_prompts = [
@@ -72,45 +121,51 @@ class ChatPanel(QFrame):
             chip_btn.setCursor(Qt.PointingHandCursor)
             chip_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(255, 255, 255, 0.05);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 16px;
-                    color: rgba(255, 255, 255, 0.85);
-                    padding: 8px 16px;
-                    font-size: 12px;
+                    background-color: rgba(0, 229, 204, 0.05);
+                    border: 1px solid rgba(0, 229, 204, 0.18);
+                    border-radius: 12px;
+                    color: rgba(255, 255, 255, 0.80);
+                    padding: 6px 12px;
+                    font-size: 11px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(124, 106, 239, 0.2);
-                    border-color: #7c6aef;
-                    color: #ffffff;
+                    background-color: rgba(0, 229, 204, 0.15);
+                    border-color: #00E5CC;
+                    color: #00E5CC;
                 }
             """)
             chip_btn.clicked.connect(lambda checked=False, m=msg: self.chip_clicked.emit(m))
             chips_layout.addWidget(chip_btn)
 
-        welcome_layout.addWidget(welcome_icon)
-        welcome_layout.addWidget(self.welcome_title)
-        welcome_layout.addWidget(welcome_sub)
+        welcome_layout.addWidget(welcome_title, 0, Qt.AlignCenter)
+        welcome_layout.addWidget(welcome_sub, 0, Qt.AlignCenter)
         welcome_layout.addWidget(chips_container)
 
         self.messages_layout.addWidget(self.welcome_widget)
         self.messages_layout.addStretch()
 
         self.scroll_area.setWidget(self.scroll_content)
-        main_layout.addWidget(self.scroll_area)
+        main_layout.addWidget(self.scroll_area, 1)
 
-    def add_user_message(self, text: str):
+    def add_user_message(self, text: str, timestamp: str = ""):
         if self.welcome_widget.isVisible():
             self.welcome_widget.hide()
-        bubble = ChatBubble(text, is_user=True, parent=self.scroll_content)
-        # Insert before stretch
+        bubble = ChatBubble(text, is_user=True, timestamp=timestamp, parent=self.scroll_content)
         self.messages_layout.insertWidget(self.messages_layout.count() - 1, bubble)
         self._scroll_to_bottom()
 
-    def add_assistant_message(self, text: str, latency_info: str = ""):
+    def add_assistant_message(self, text: str, latency_info: str = "", timestamp: str = ""):
         if self.welcome_widget.isVisible():
             self.welcome_widget.hide()
-        bubble = ChatBubble(text, is_user=False, latency_info=latency_info, parent=self.scroll_content)
+        bubble = ChatBubble(text, is_user=False, latency_info=latency_info, timestamp=timestamp, parent=self.scroll_content)
+        self.messages_layout.insertWidget(self.messages_layout.count() - 1, bubble)
+        self._scroll_to_bottom()
+        return bubble
+
+    def add_tool_message(self, text: str, tool_name: str = "", timestamp: str = ""):
+        if self.welcome_widget.isVisible():
+            self.welcome_widget.hide()
+        bubble = ChatBubble(text, is_tool=True, tool_name=tool_name, timestamp=timestamp, parent=self.scroll_content)
         self.messages_layout.insertWidget(self.messages_layout.count() - 1, bubble)
         self._scroll_to_bottom()
 
@@ -120,6 +175,7 @@ class ChatPanel(QFrame):
             if item.widget() and item.widget() != self.welcome_widget:
                 item.widget().deleteLater()
         self.welcome_widget.show()
+        self.clear_requested.emit()
 
     def _scroll_to_bottom(self):
         QApplication.processEvents()
@@ -134,11 +190,13 @@ if __name__ == "__main__":
     layout = QVBoxLayout(window)
     
     chat_panel = ChatPanel()
-    chat_panel.add_user_message("Hello , how are you")
-    chat_panel.add_assistant_message("I'm good, just chillin'. You've had a busy day!", latency_info="⚡ STT 734ms • TTFA 7129ms")
+    chat_panel.add_assistant_message("Online, sir. Try me.", timestamp="23:14:21")
+    chat_panel.add_user_message("Text my girlfriend that I miss you.", timestamp="23:15:26")
+    chat_panel.add_tool_message("Text sent to Kayla: I miss you.", tool_name="send_sms", timestamp="23:15:27")
+    chat_panel.add_assistant_message("All systems optimal, sir.", timestamp="23:15:29")
     
     layout.addWidget(chat_panel)
-    window.resize(700, 500)
-    window.setWindowTitle("ChatPanel Preview")
+    window.resize(450, 550)
+    window.setWindowTitle("ChatPanel Tactical Preview")
     window.show()
     sys.exit(app.exec())

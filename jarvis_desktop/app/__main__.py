@@ -45,9 +45,19 @@ async def main_async(app: QApplication):
     # Show initial view
     win_mgr.show_main_window()
 
-    # Initial Health & Dashboard Fetch
-    asyncio.create_task(backend_service.check_health())
-    asyncio.create_task(backend_service.fetch_dashboard())
+    # Initial Health & Dashboard Fetch (with retry)
+    async def health_loop():
+        """Retry health check every 30s — auto-reconnects when backend comes online."""
+        while win_mgr.main_win.isVisible() or win_mgr.tray.isVisible():
+            try:
+                is_online = await backend_service.check_health()
+                if is_online:
+                    await backend_service.fetch_dashboard()
+            except Exception:
+                pass
+            await asyncio.sleep(30)
+
+    asyncio.create_task(health_loop())
 
     try:
         while win_mgr.main_win.isVisible() or win_mgr.tray.isVisible():

@@ -1,8 +1,12 @@
 # jarvis_desktop/app/services/backend_service.py
 
 import asyncio
+import os
 import httpx
+from dotenv import load_dotenv
 from PySide6.QtCore import QObject, Signal
+
+load_dotenv()
 
 class BackendService(QObject):
     """
@@ -21,12 +25,19 @@ class BackendService(QObject):
     def __init__(self, base_url: str = "http://127.0.0.1:8000", parent=None):
         super().__init__(parent)
         self.base_url = base_url
-        self.client = httpx.AsyncClient(base_url=self.base_url, timeout=15.0)
+        auth_token = os.getenv("JARVIS_API_TOKEN", "") or os.getenv("JARVIS_API_KEY", "") or "jarvis-auth-token-98f2c7a3"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JARVIS-Desktop/1.0",
+            "Authorization": f"Bearer {auth_token}",
+            "X-API-Key": auth_token,
+            "X-JARVIS-Token": auth_token,
+        }
+        self.client = httpx.AsyncClient(base_url=self.base_url, headers=headers, timeout=30.0)
 
     async def check_health(self) -> bool:
-        """Ping backend to update status badge"""
+        """Ping backend to update status badge quietly"""
         try:
-            resp = await self.client.get("/status")
+            resp = await self.client.get("/health")
             is_online = resp.status_code == 200
             self.status_changed.emit(is_online)
             return is_online
@@ -35,34 +46,55 @@ class BackendService(QObject):
             return False
 
     async def fetch_dashboard(self):
-        """Fetch dashboard metrics and state"""
+        """Fetch dashboard metrics and live usage telemetry from /dashboard and /usage"""
         try:
+            print("[BackendService] GET http://127.0.0.1:8000/dashboard ...")
             resp = await self.client.get("/dashboard")
-            if resp.status_code == 200:
-                data = resp.json()
-                self.dashboard_updated.emit(data)
-                self.status_changed.emit(True)
-            else:
-                self.status_changed.emit(False)
+            print(f"[BackendService] GET /dashboard -> HTTP {resp.status_code}")
+
+            print("[BackendService] GET http://127.0.0.1:8000/usage ...")
+            usage_resp = await self.client.get("/usage")
+            print(f"[BackendService] GET /usage -> HTTP {usage_resp.status_code}")
+
+            data = resp.json() if resp.status_code == 200 else {}
+            events = {}
+            if usage_resp.status_code == 200:
+                u_data = usage_resp.json()
+                events = u_data.get("events", {}) or u_data.get("features", {}) or {}
+
+            data["metrics"] = {
+                "Dashboard": events.get("dashboard_open", 1),
+                "Morning Brief": events.get("morning_brief", 0),
+                "Screen Analysis": events.get("screen_analysis", 0),
+                "Resume Session": events.get("resume_session", 0),
+                "Browser Opens": events.get("browser_open", 0),
+            }
+            self.dashboard_updated.emit(data)
+            self.status_changed.emit(True)
         except Exception as e:
+            print(f"[BackendService] Dashboard error: {e}")
             self.status_changed.emit(False)
             self.error_occurred.emit(f"Dashboard error: {str(e)}")
 
     async def send_chat_message(self, text: str, mode: str = "jarvis"):
         """Send non-streaming chat message to /chat endpoint"""
         try:
+            print(f"[BackendService] POST http://127.0.0.1:8000/chat | payload: '{text[:50]}' ...")
             payload = {
                 "message": text,
                 "mode": mode,
                 "vision_mode": False
             }
             resp = await self.client.post("/chat", json=payload)
+            print(f"[BackendService] POST /chat -> HTTP {resp.status_code}")
             if resp.status_code == 200:
                 data = resp.json()
+                print(f"[BackendService] Received response ({len(data.get('response', ''))} chars)")
                 self.chat_response_received.emit(data)
             else:
                 self.error_occurred.emit(f"Chat failed with status {resp.status_code}")
         except Exception as e:
+            print(f"[BackendService] Chat error: {e}")
             self.error_occurred.emit(f"Chat error: {str(e)}")
 
     async def stream_chat_message(self, text: str, mode: str = "jarvis"):
@@ -70,28 +102,50 @@ class BackendService(QObject):
         try:
             payload = {"message": text, "mode": mode}
             endpoint = "/chat/jarvis/stream" if mode == "jarvis" else "/chat/stream"
-            
+
             async with self.client.stream("POST", endpoint, json=payload) as response:
                 if response.status_code == 200:
                     accumulated = ""
-                    async for chunk in response.aiter_text():
-                        if chunk:
-                            accumulated += chunk
-                            self.chat_chunk_received.emit(chunk)
-                    
-                    # Emit final payload
+                    flow_steps = []
+                    step_count = 1
+
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if not line:
+                            continue
+
+                        if line.startswith("data:"):
+                            line = line[5:].strip()
+
+                        try:
+                            data = json.loads(line)
+                            # Extract clean text chunk token
+                            if "chunk" in data and data["chunk"]:
+                                chunk_text = str(data["chunk"])
+                                accumulated += chunk_text
+                                self.chat_chunk_received.emit(chunk_text)
+
+                            # Extract activity flow events
+                            if "activity" in data and isinstance(data["activity"], dict):
+                                act = data["activity"]
+                                evt = act.get("event", "")
+                                msg = act.get("message", act.get("route", evt))
+                                flow_steps.append({"step": str(step_count), "title": evt, "detail": str(msg)})
+                                step_count += 1
+
+                            if data.get("done") is True and not data.get("chunk"):
+                                break
+                        except Exception:
+                            pass
+
+                    # Emit final completed chat payload
                     self.chat_response_received.emit({
                         "response": accumulated,
-                        "flow": [
-                            {"step": "1", "title": "Query detected", "detail": text},
-                            {"step": "2", "title": "Token streaming", "detail": "Completed token stream"}
-                        ]
+                        "flow": flow_steps
                     })
                 else:
-                    # Fallback to non-streaming endpoint if streaming endpoint is unavailable
                     await self.send_chat_message(text, mode)
         except Exception:
-            # Fallback to standard chat endpoint
             await self.send_chat_message(text, mode)
 
     async def fetch_briefing(self):
@@ -114,6 +168,49 @@ class BackendService(QObject):
                 self.action_completed.emit(resp.json())
         except Exception as e:
             self.error_occurred.emit(f"Action error: {str(e)}")
+
+    async def transcribe_audio(self, wav_bytes: bytes) -> str:
+        """Send audio bytes to /stt endpoint for speech-to-text transcription"""
+        try:
+            files = {'file': ('audio.wav', wav_bytes, 'audio/wav')}
+            resp = await self.client.post("/stt", files=files)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("text", "").strip()
+            else:
+                self.error_occurred.emit(f"STT failed with status {resp.status_code}")
+                return ""
+        except Exception as e:
+            self.error_occurred.emit(f"STT error: {str(e)}")
+            return ""
+
+    async def analyze_vision(self, image_b64: str, prompt: str = "Analyze this screen screenshot and summarize key items"):
+        """Send screen capture base64 image to vision chat endpoint"""
+        try:
+            payload = {
+                "message": f"[Screen Capture Analysis] {prompt}",
+                "image_b64": image_b64,
+                "vision_mode": True
+            }
+            resp = await self.client.post("/chat", json=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                self.chat_response_received.emit(data)
+            else:
+                self.error_occurred.emit(f"Vision analysis failed with status {resp.status_code}")
+        except Exception as e:
+            self.error_occurred.emit(f"Vision error: {str(e)}")
+
+    async def synthesize_speech(self, text: str) -> bytes:
+        """Fetch TTS audio bytes from /tts endpoint"""
+        try:
+            resp = await self.client.post("/tts", json={"text": text})
+            if resp.status_code == 200:
+                return resp.content
+            return b""
+        except Exception as e:
+            self.error_occurred.emit(f"TTS error: {str(e)}")
+            return b""
 
     async def close(self):
         """Close HTTP client session"""

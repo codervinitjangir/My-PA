@@ -510,7 +510,10 @@ try:
 except Exception:
     AUDIO_PLAYER = None
 
+LAST_JARVIS_REPLY_TEXT = ""
+
 def handle_wake_detection():
+    global LAST_JARVIS_REPLY_TEXT
     beep()
     
     import sounddevice as sd
@@ -585,7 +588,6 @@ def handle_wake_detection():
         logger.info("[WAKE] Recognized (raw): %s", text)
 
         # Self-Echo Suppressor: if recognized text matches JARVIS's own last spoken reply, drop it!
-        global LAST_JARVIS_REPLY_TEXT
         if LAST_JARVIS_REPLY_TEXT and (
             text.lower() in LAST_JARVIS_REPLY_TEXT.lower() or
             LAST_JARVIS_REPLY_TEXT.lower() in text.lower()
@@ -629,7 +631,6 @@ def handle_wake_detection():
         reply_text = chat_resp.get("response", "").strip()
         logger.info("[WAKE] JARVIS replied: %s", reply_text)
         
-        global LAST_JARVIS_REPLY_TEXT
         LAST_JARVIS_REPLY_TEXT = reply_text
         
         # --- Auto-Open URLs & Apps ---
