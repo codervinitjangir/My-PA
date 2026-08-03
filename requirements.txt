@@ -69,3 +69,13 @@ pytz>=2024.1
 
 # ── Telegram Bot ──────────────────────────────────────────────────────────────
 python-telegram-bot>=20.7
+
+# ── Background Monitor & News Search (DDG fallback) ───────────────────────────
+# Used by app/services/news_search.py (parallel Gemini+DDG race)
+# and app/services/background_monitor.py (topic news dedup)
+duckduckgo-search>=6.0.0
+
+# ── GPU Monitoring (optional — NVIDIA GPUs only) ──────────────────────────────
+# Used by app/services/hardware_monitor.py via pynvml.
+# Falls back silently to NVML ctypes if pynvml is absent.
+# pynvml>=11.5.0

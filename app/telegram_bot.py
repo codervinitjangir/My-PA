@@ -525,6 +525,136 @@ async def photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"[TELEGRAM] Error processing photo: {e}", exc_info=True)
         await update.message.reply_text("Sorry, I encountered an error processing your photo.")
 
+# ── Feature: Background Topic Monitor (/monitor) ─────────────────────────────
+
+@owner_only
+async def monitor_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /monitor [watch|unwatch|list] [topic]
+
+    Examples:
+      /monitor watch AI chips         → start watching
+      /monitor unwatch AI chips       → stop watching
+      /monitor list                   → show all watched topics
+      /monitor check                  → run an immediate check now
+    """
+    db_path = os.getenv("MEMORY_DB_PATH", "database/jarvis_memory.db")
+    args_str = " ".join(context.args).strip()
+    parts = args_str.split(None, 1)
+    sub = parts[0].lower() if parts else "list"
+    topic = parts[1].strip() if len(parts) > 1 else ""
+
+    try:
+        import asyncio
+        from app.services.background_monitor import (
+            add_monitor, remove_monitor, list_monitors, check_all_monitors
+        )
+
+        if sub in ("watch", "add", "start"):
+            if not topic:
+                await update.message.reply_text(
+                    "Usage: /monitor watch [topic]\nExample: /monitor watch AI news"
+                )
+                return
+            result = await asyncio.to_thread(add_monitor, db_path, topic)
+            await update.message.reply_text(result)
+
+        elif sub in ("unwatch", "remove", "stop", "delete"):
+            if not topic:
+                await update.message.reply_text(
+                    "Usage: /monitor unwatch [topic]\nExample: /monitor unwatch AI news"
+                )
+                return
+            result = await asyncio.to_thread(remove_monitor, db_path, topic)
+            await update.message.reply_text(result)
+
+        elif sub == "list":
+            topics = await asyncio.to_thread(list_monitors, db_path)
+            if topics:
+                lines = ["📡 *Monitored topics:*"] + [f"• {t}" for t in topics]
+                await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+            else:
+                await update.message.reply_text(
+                    "No topics monitored yet.\n"
+                    "Use /monitor watch [topic] to add one."
+                )
+
+        elif sub == "check":
+            await update.message.reply_text("Running topic checks now...")
+            alerts = await asyncio.to_thread(check_all_monitors, db_path)
+            if alerts:
+                for a in alerts:
+                    await update.message.reply_text(a[:4090])
+            else:
+                await update.message.reply_text("✅ No new headlines for your watched topics.")
+
+        else:
+            await update.message.reply_text(
+                "Usage:\n"
+                "/monitor watch [topic]\n"
+                "/monitor unwatch [topic]\n"
+                "/monitor list\n"
+                "/monitor check"
+            )
+    except Exception as e:
+        logger.error("[TELEGRAM] /monitor error: %s", e)
+        await update.message.reply_text(f"⚠️ Monitor error: {e}")
+
+
+# ── Feature: OS-Native Smart Reminders (/remind) ─────────────────────────────
+
+@owner_only
+async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /remind YYYY-MM-DD HH:MM Your reminder message
+
+    Sets an OS-native reminder that survives JARVIS restarts.
+    Uses Windows Task Scheduler / macOS LaunchAgent / Linux systemd-run.
+
+    Example:
+      /remind 2026-08-05 09:00 Stand-up meeting in 5 minutes
+    """
+    raw = " ".join(context.args).strip()
+    if not raw:
+        await update.message.reply_text(
+            "Usage: /remind YYYY-MM-DD HH:MM Your message\n"
+            "Example: /remind 2026-08-05 09:00 Stand-up in 5 minutes"
+        )
+        return
+
+    try:
+        import asyncio
+        from app.services.reminder_service import parse_and_set_reminder
+        result = await asyncio.to_thread(parse_and_set_reminder, raw)
+        await update.message.reply_text(result)
+    except Exception as e:
+        logger.error("[TELEGRAM] /remind error: %s", e)
+        await update.message.reply_text(f"⚠️ Reminder error: {e}")
+
+
+# ── Feature: Parallel News Search (/news) ─────────────────────────────────────
+
+@owner_only
+async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /news [topic]  — Parallel Gemini + DDG first-result-wins news search.
+
+    If no topic given, fetches current top world news.
+    Example: /news AI chipmakers
+    """
+    query = " ".join(context.args).strip() or "top world news today"
+    await update.message.reply_text(f"🔍 Searching news for: {query}...")
+
+    try:
+        import asyncio
+        from app.services.news_search import search_news_parallel
+        result = await asyncio.to_thread(search_news_parallel, query, 12.0)
+        await update.message.reply_text(result[:4090])
+    except Exception as e:
+        logger.error("[TELEGRAM] /news error: %s", e)
+        await update.message.reply_text(f"⚠️ News search failed: {e}")
+
+
 async def start_telegram_bot(chat_service):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -585,6 +715,9 @@ async def start_telegram_bot(chat_service):
     application.add_handler(CommandHandler("forget", forget_command))
     application.add_handler(CommandHandler("mode", mode_command))
     application.add_handler(CommandHandler("apply_fix", apply_fix_command))
+    application.add_handler(CommandHandler("monitor", monitor_command))
+    application.add_handler(CommandHandler("remind", remind_command))
+    application.add_handler(CommandHandler("news", news_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     application.add_handler(MessageHandler(filters.PHOTO, photo_message))
     

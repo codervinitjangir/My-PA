@@ -235,6 +235,40 @@ async def proactive_check(telegram_app, chat_service, memory_service, groq_servi
         logger.error("[SCHEDULER] proactive_check failed: %s", e)
 
 
+async def _run_monitor_check():
+    """
+    Daily background monitor job — checks all watched topics via DDG news.
+    Sends [MONITOR_ALERT] messages to the Telegram owner for any new headlines.
+    Silently skips if no topics are watched or if Telegram is not configured.
+    """
+    try:
+        db_path = os.getenv("MEMORY_DB_PATH", "database/jarvis_memory.db")
+        from app.services.background_monitor import check_all_monitors
+        import asyncio
+        alerts = await asyncio.to_thread(check_all_monitors, db_path)
+        if not alerts:
+            logger.debug("[SCHEDULER] Monitor check: no new headlines.")
+            return
+
+        token    = os.getenv("TELEGRAM_BOT_TOKEN")
+        owner_id = os.getenv("TELEGRAM_OWNER_ID")
+        if not token or not owner_id:
+            logger.debug("[SCHEDULER] Monitor alerts generated but no Telegram config.")
+            return
+
+        from telegram import Bot
+        bot = Bot(token=token)
+        for alert in alerts:
+            try:
+                await bot.send_message(chat_id=int(owner_id), text=f"📡 {alert[:4090]}")
+                logger.info("[SCHEDULER] Sent monitor alert to owner.")
+            except Exception as e:
+                logger.warning("[SCHEDULER] Could not send monitor alert: %s", e)
+
+    except Exception as e:
+        logger.error("[SCHEDULER] _run_monitor_check failed: %s", e)
+
+
 def init_scheduler(groq_service, memory_service=None, chat_service=None, telegram_app=None):
     global _scheduler, _telegram_app
     if _scheduler is not None:
@@ -301,6 +335,17 @@ def init_scheduler(groq_service, memory_service=None, chat_service=None, telegra
             replace_existing=True,
         )
         logger.info("[SCHEDULER] Proactive engine check scheduled every 5 minutes")
+
+    # Background topic monitor: runs daily at 09:00, pushes [MONITOR_ALERT] to Telegram
+    _scheduler.add_job(
+        _run_monitor_check,
+        "cron",
+        hour=9,
+        minute=0,
+        id="background_monitor_check",
+        replace_existing=True,
+    )
+    logger.info("[SCHEDULER] Background topic monitor scheduled daily at 09:00")
 
     _scheduler.start()
     logger.info("[SCHEDULER] APScheduler started. Daily briefing set for 08:00 %s.", timezone)
