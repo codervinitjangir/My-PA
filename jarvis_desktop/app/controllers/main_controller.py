@@ -260,3 +260,4 @@ class MainController(QObject):
     def _on_error(self, err_msg: str):
         self.sys_state.set_voice_state("idle")
         print(f"[MainController Error]: {err_msg}")
+        self.win.chat_panel.add_assistant_message(f"⚠️ Error: {err_msg}")

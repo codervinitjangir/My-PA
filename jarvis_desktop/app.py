@@ -2,6 +2,13 @@
 
 import sys
 import os
+from dotenv import load_dotenv
+
+# Ensure .env is loaded from the project root, regardless of where the script is executed from
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env_path = os.path.join(project_root, ".env")
+load_dotenv(env_path)
+
 import asyncio
 import qasync
 import threading
@@ -46,9 +53,11 @@ async def main_async(app: QApplication):
     # Start the laptop client websocket loop in the background
     asyncio.create_task(laptop_client.connect_and_listen())
 
-    # Keep async event loop alive
+    # Keep async event loop alive and occasionally check health
     while main_window.isVisible():
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(10.0)
+        # Periodically ping the health endpoint to recover from 'Offline' state (e.g. Render server waking up)
+        await backend_service.check_health()
 
     await backend_service.close()
     laptop_client.QUIT_FLAG = True
