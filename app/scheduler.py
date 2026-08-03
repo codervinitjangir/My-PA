@@ -9,6 +9,7 @@ logger = logging.getLogger("J.A.R.V.I.S")
 
 LAST_BRIEFING = "No briefing yet."
 _scheduler = None
+_telegram_app = None   # reference to running telegram Application for proactive jobs
 
 
 def _classify_google_error(e: Exception) -> tuple:
@@ -60,11 +61,11 @@ def _classify_google_error(e: Exception) -> tuple:
     return f"unknown ({type(e).__name__})", raw
 
 
-async def generate_briefing(groq_service):
+async def generate_briefing(groq_service, memory_service=None):
     global LAST_BRIEFING
     logger.info("[SCHEDULER] Generating morning briefing...")
 
-    # ── Calendar ──────────────────────────────────────────────────────────────
+    # ── Calendar ──────────────────────────────────────────────────────────────────────
     try:
         cal_tool = GoogleCalendarTool()
         calendar_data = cal_tool.execute()
@@ -74,7 +75,7 @@ async def generate_briefing(groq_service):
         calendar_data = f"TOOL_ERROR [calendar]: category={cat} | detail={detail}"
         logger.error("[SCHEDULER] Calendar fetch failed: category=%s | %s", cat, detail)
 
-    # ── Gmail ─────────────────────────────────────────────────────────────────
+    # ── Gmail ────────────────────────────────────────────────────────────────────────
     try:
         gmail_tool = GmailSummaryTool()
         gmail_data = gmail_tool.execute()
@@ -84,11 +85,24 @@ async def generate_briefing(groq_service):
         gmail_data = f"TOOL_ERROR [gmail]: category={cat} | detail={detail}"
         logger.error("[SCHEDULER] Gmail fetch failed: category=%s | %s", cat, detail)
 
-    # ── Build honest LLM prompt ───────────────────────────────────────────────
+    # ── Session summary (Mark-L-inspired: pop once, never repeat) ──────────────────
+    session_summary_block = ""
+    if memory_service:
+        try:
+            session_summary = memory_service.pop_latest_session_summary()
+            if session_summary:
+                session_summary_block = f"Recent Session Snapshot:\n{session_summary}\n\n"
+                logger.info("[SCHEDULER] Injecting session summary into briefing.")
+        except Exception as e:
+            logger.warning("[SCHEDULER] Could not fetch session summary: %s", e)
+
+    # ── Build honest LLM prompt ────────────────────────────────────────────────
     prompt = (
         "You are JARVIS. Generate a concise morning briefing for Boss. "
         "Include: today's schedule, email summary, and one motivational line. "
-        "Keep it under 120 words. Speak as JARVIS from Iron Man.\n\n"
+        "If a 'Recent Session Snapshot' is provided, weave it naturally into the briefing "
+        "(e.g., 'Following up on yesterday\'s session...'). "
+        "Keep it under 150 words. Speak as JARVIS from Iron Man.\n\n"
         "CRITICAL INSTRUCTION — Error Honesty Rules:\n"
         "  If a data source contains TOOL_ERROR, report the real category you were given:\n"
         "    • auth_expired              → say: the Google authentication token has expired or been revoked\n"
@@ -99,6 +113,7 @@ async def generate_briefing(groq_service):
         "  NEVER say 'browser issues', 'lost browser connectivity', or invent any reason "
         "that was not explicitly given in the category above. "
         "Use only the exact category label you received.\n\n"
+        f"{session_summary_block}"
         f"Schedule:\n{calendar_data}\n\n"
         f"Emails:\n{gmail_data}"
     )
@@ -126,10 +141,106 @@ async def generate_briefing(groq_service):
         logger.error("[SCHEDULER] Failed to generate briefing: %s", e)
 
 
-def init_scheduler(groq_service):
-    global _scheduler
+async def session_idle_checker(chat_service, memory_service, groq_service):
+    """
+    Runs every 10 minutes. Checks all active sessions for 30+ minutes of
+    inactivity and triggers end_session_summary() for idle ones.
+    Marks sessions as summarized to avoid double-summarizing.
+    """
+    import time as _time
+    now = _time.time()
+    IDLE_THRESHOLD_SEC = 30 * 60  # 30 minutes
+
+    if not hasattr(chat_service, '_session_last_activity'):
+        chat_service._session_last_activity = {}
+    if not hasattr(chat_service, '_session_summarized'):
+        chat_service._session_summarized = set()
+
+    for session_id, messages in list(chat_service.sessions.items()):
+        # Skip already-summarized sessions
+        if session_id in chat_service._session_summarized:
+            continue
+        # Skip empty sessions
+        if not messages:
+            continue
+
+        last_active = chat_service._session_last_activity.get(session_id, 0)
+        if last_active == 0:
+            continue  # no activity tracked yet — skip
+
+        idle_for = now - last_active
+        if idle_for >= IDLE_THRESHOLD_SEC:
+            logger.info(
+                "[SCHEDULER] Session %s idle for %.0f min — triggering end-of-session summary.",
+                session_id[:12],
+                idle_for / 60,
+            )
+            try:
+                summary = await __import__('asyncio').to_thread(
+                    memory_service.end_session_summary,
+                    session_id,
+                    messages,
+                    groq_service,
+                )
+                if summary:
+                    chat_service._session_summarized.add(session_id)
+                    logger.info("[SCHEDULER] End-session summary stored for %s.", session_id[:12])
+            except Exception as e:
+                logger.error("[SCHEDULER] session_idle_checker error for %s: %s", session_id[:12], e)
+
+
+async def proactive_check(telegram_app, chat_service, memory_service, groq_service):
+    """
+    Runs every 5 minutes. Checks if the ProactiveEngine should fire an
+    unprompted message to the owner via Telegram.
+    """
+    if telegram_app is None:
+        return
+
+    try:
+        proactive_engine = telegram_app.bot_data.get("proactive_engine")
+        last_msg_time = telegram_app.bot_data.get("last_telegram_message_time")
+
+        if proactive_engine is None:
+            return
+
+        if not proactive_engine.should_trigger(last_msg_time):
+            return
+
+        session_id = chat_service.get_or_create_session("telegram")
+
+        import asyncio
+        message = await asyncio.to_thread(
+            proactive_engine.generate_proactive_message,
+            groq_service,
+            chat_service,
+            session_id,
+            memory_service,
+        )
+
+        if not message:
+            return
+
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        owner_id = os.getenv("TELEGRAM_OWNER_ID")
+        if token and owner_id:
+            from telegram import Bot
+            bot = Bot(token=token)
+            await bot.send_message(chat_id=int(owner_id), text=message)
+            # Mark AFTER confirmed delivery — a send failure won't eat the cooldown
+            proactive_engine.mark_triggered()
+            logger.info("[PROACTIVE] Sent unprompted message to owner.")
+
+    except Exception as e:
+        logger.error("[SCHEDULER] proactive_check failed: %s", e)
+
+
+def init_scheduler(groq_service, memory_service=None, chat_service=None, telegram_app=None):
+    global _scheduler, _telegram_app
     if _scheduler is not None:
         return
+
+    _telegram_app = telegram_app
 
     timezone = os.getenv("TIMEZONE", "Asia/Kolkata")
     _scheduler = AsyncIOScheduler(timezone=timezone)
@@ -140,7 +251,7 @@ def init_scheduler(groq_service):
         'cron',
         hour=8,
         minute=0,
-        args=[groq_service],
+        args=[groq_service, memory_service],
         id='morning_briefing',
         replace_existing=True
     )
@@ -166,6 +277,30 @@ def init_scheduler(groq_service):
         replace_existing=True,
     )
     logger.info("[SCHEDULER] Self-diagnostic job scheduled every 30 minutes")
+
+    # Session-end idle checker: every 10 min, summarizes sessions idle 30+ min
+    if memory_service and chat_service:
+        _scheduler.add_job(
+            session_idle_checker,
+            "interval",
+            minutes=10,
+            args=[chat_service, memory_service, groq_service],
+            id="session_idle_checker",
+            replace_existing=True,
+        )
+        logger.info("[SCHEDULER] Session idle checker scheduled every 10 minutes")
+
+    # Proactive engine check: every 5 min, fires unprompted Telegram message if needed
+    if telegram_app is not None and chat_service and memory_service:
+        _scheduler.add_job(
+            proactive_check,
+            "interval",
+            minutes=5,
+            args=[telegram_app, chat_service, memory_service, groq_service],
+            id="proactive_check",
+            replace_existing=True,
+        )
+        logger.info("[SCHEDULER] Proactive engine check scheduled every 5 minutes")
 
     _scheduler.start()
     logger.info("[SCHEDULER] APScheduler started. Daily briefing set for 08:00 %s.", timezone)

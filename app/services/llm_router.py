@@ -384,7 +384,29 @@ class LLMRouter:
         question: str,
         chat_history: Optional[List[tuple]] = None,
     ) -> Tuple[str, Optional[dict]]:
-        """Tavily search is always handled by Groq's client. Unchanged."""
+        """
+        Pre-fetch live web data before routing the question.
+
+        Strategy (priority order):
+          1. Gemini grounded search  — free, cites Google's live index, no extra key
+          2. Groq / Tavily           — paid, structured payload, used as fallback
+
+        Gemini's result is preferred because it is free and comes with citations.
+        Tavily is tried if Gemini is unavailable or returns empty.
+        Both return (formatted_text, payload_dict_or_None).
+        """
+        # ── Try Gemini grounded first ────────────────────────────────────────
+        if self.gemini is not None:
+            try:
+                gemini_text, _ = self.gemini.prefetch_web_search(question, chat_history)
+                if gemini_text:
+                    logger.info("[LLMRouter] prefetch: Gemini grounded (%d chars)", len(gemini_text))
+                    return (gemini_text, None)
+            except Exception as e:
+                logger.warning("[LLMRouter] Gemini prefetch failed, falling back to Tavily: %s", e)
+
+        # ── Fall back to Groq / Tavily ───────────────────────────────────────
+        logger.debug("[LLMRouter] prefetch: Tavily fallback")
         return self.groq_provider.prefetch_web_search(question, chat_history)
 
     def set_model(self, new_model: str) -> None:

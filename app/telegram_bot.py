@@ -32,7 +32,29 @@ def owner_only(func):
 
 @owner_only
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Good day, Boss. J.A.R.V.I.S online. Send me anything or use /brief, /cal, /mail.\n/sendfile pdf — get latest PDF from Gmail or Downloads")
+    await update.message.reply_text("Good day, Boss. J.A.R.V.I.S online. Send me anything or use /brief, /cal, /mail, /stats.\n/sendfile pdf — get latest PDF from Gmail or Downloads")
+
+
+@owner_only
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /stats — On-demand hardware health snapshot via Telegram.
+
+    Calls HardwareMonitor.get_hardware_snapshot() in a thread (psutil is blocking)
+    and replies with a formatted summary of CPU, RAM, disk, temperatures, and uptime.
+    This is on-demand only — no continuous background monitoring or alerts.
+    """
+    await update.message.reply_text("Pulling hardware stats, Boss...")
+    try:
+        from app.services.hardware_monitor import get_hardware_snapshot, format_for_telegram
+        import asyncio
+        snapshot = await asyncio.to_thread(get_hardware_snapshot)
+        text = format_for_telegram(snapshot)
+        await update.message.reply_text(text, parse_mode="Markdown")
+    except Exception as e:
+        logger.error("[TELEGRAM] /stats failed: %s", e)
+        await update.message.reply_text(f"⚠️ Could not retrieve hardware stats: {e}")
+
 
 @owner_only
 async def brief_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -297,6 +319,10 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not chat_service:
         await update.message.reply_text("Error: ChatService not available.")
         return
+
+    # Track last message time for proactive engine silence detection
+    import time as _time
+    context.application.bot_data["last_telegram_message_time"] = _time.time()
         
     user_text = update.message.text
     from app.utils.wake_word_utils import strip_wake_word
@@ -321,7 +347,9 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @owner_only
 async def screen_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Capture and analyze current screen, update GlobalStateManager, reply with summary."""
-    await update.message.reply_text("Analyzing your screen, Boss...")
+    # INSTANT VISION ACKNOWLEDGMENT — reply immediately before starting capture
+    # so the owner sees feedback right away instead of 2-3 seconds of dead-air.
+    await update.message.reply_text("Looking at your screen now, Sir.")
     try:
         from app.services.vision_service import VisionService
         from app.main import _state_mgr, _SCREEN_PROMPT
@@ -537,11 +565,17 @@ async def start_telegram_bot(chat_service):
     application = ApplicationBuilder().token(token).build()
     application.bot_data["chat_service"] = chat_service
     application.bot_data["memory_service"] = getattr(chat_service, 'memory_service', None)
+
+    # Wire proactive engine — stores instance so scheduler can reference it
+    from app.services.proactive_engine import ProactiveEngine
+    application.bot_data["proactive_engine"] = ProactiveEngine()
+    application.bot_data["last_telegram_message_time"] = None  # None until first message
     
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("brief", brief_command))
     application.add_handler(CommandHandler("cal", cal_command))
     application.add_handler(CommandHandler("mail", mail_command))
+    application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("screen", screen_command))
     application.add_handler(CommandHandler("press", press_command))
     application.add_handler(CommandHandler("type", type_command))

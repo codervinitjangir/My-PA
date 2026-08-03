@@ -15,3 +15,6 @@ client_secret_*.json
 *.log
 app/logs/
 laptop_client.log
+
+# Reference clone — not part of this project
+Jarvis from github/

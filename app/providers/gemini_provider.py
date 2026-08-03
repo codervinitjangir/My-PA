@@ -140,6 +140,42 @@ class GeminiProvider(BaseProvider):
             max_output_tokens=1024,
         )
 
+    def _gemini_grounded_search(self, query: str, client_index: int = 0) -> str:
+        """
+        Runs a Gemini-grounded Google Search request and returns the text result.
+
+        This uses Gemini's built-in google_search tool — no Tavily API key needed,
+        no extra cost. Results carry live citations sourced from Google's index.
+
+        Returns an empty string on any failure so callers can gracefully fall back
+        to the Tavily payload already injected by LLMRouter.
+        """
+        try:
+            client = self._clients[client_index % len(self._clients)]
+            response = client.models.generate_content(
+                model=self.MODEL,
+                contents=query,
+                config=_genai_types.GenerateContentConfig(
+                    tools=[_genai_types.Tool(google_search=_genai_types.GoogleSearch())],
+                    temperature=0.1,        # factual — keep low
+                    max_output_tokens=1024,
+                ),
+            )
+            text = ""
+            for candidate in response.candidates:
+                for part in candidate.content.parts:
+                    if hasattr(part, "text") and part.text:
+                        text += part.text
+            result = text.strip()
+            if result:
+                logger.info("[Gemini] Grounded search returned %d chars for: %.60s", len(result), query)
+            else:
+                logger.debug("[Gemini] Grounded search returned empty for: %.60s", query)
+            return result
+        except Exception as e:
+            logger.warning("[Gemini] Grounded search failed (%s): %s", type(e).__name__, str(e)[:120])
+            return ""
+
     # ── Public interface ───────────────────────────────────────────────────────
 
     def get_response(
@@ -150,7 +186,26 @@ class GeminiProvider(BaseProvider):
         use_search: bool = False,
     ) -> str:
         mode = REALTIME_CHAT_ADDENDUM if use_search else GENERAL_CHAT_ADDENDUM
-        system = self._build_system_prompt(question, chat_history, mode_addendum=mode)
+
+        # ── Gemini grounded search (live web data, free) ────────────────────
+        # When use_search is True we ask Gemini's own Google Search tool for
+        # live data BEFORE building the conversational prompt.  The raw result
+        # is prepended as a [LIVE WEB DATA] block so the model can cite it.
+        extra_parts: List[str] = []
+        if use_search:
+            grounded = self._gemini_grounded_search(question, key_start_index)
+            if grounded:
+                extra_parts.append(
+                    f"[LIVE WEB DATA — use this to answer the user's question, "
+                    f"do not invent facts beyond what is shown below]:\n"
+                    f"{_escape_braces(grounded)}"
+                )
+
+        system = self._build_system_prompt(
+            question, chat_history,
+            extra_parts=extra_parts if extra_parts else None,
+            mode_addendum=mode,
+        )
         contents = self._build_contents(question, chat_history)
 
         t0 = time.perf_counter()
@@ -175,7 +230,7 @@ class GeminiProvider(BaseProvider):
                 last_exc = e
                 if j < n - 1: continue
                 break
-        
+
         raise last_exc
 
     def stream_response(
@@ -190,7 +245,22 @@ class GeminiProvider(BaseProvider):
         extra = []
         if "tools_str" in kwargs and kwargs["tools_str"]:
             extra.append(kwargs["tools_str"])
-        system = self._build_system_prompt(question, chat_history, extra_parts=extra if extra else None, mode_addendum=mode)
+
+        # ── Gemini grounded search on streaming path ────────────────────────
+        if use_search:
+            grounded = self._gemini_grounded_search(question, key_start_index)
+            if grounded:
+                extra.append(
+                    f"[LIVE WEB DATA — use this to answer the user's question, "
+                    f"do not invent facts beyond what is shown below]:\n"
+                    f"{_escape_braces(grounded)}"
+                )
+
+        system = self._build_system_prompt(
+            question, chat_history,
+            extra_parts=extra if extra else None,
+            mode_addendum=mode,
+        )
         contents = self._build_contents(question, chat_history)
 
         last_exc = None
@@ -273,5 +343,24 @@ class GeminiProvider(BaseProvider):
         question: str,
         chat_history: Optional[List[tuple]] = None,
     ) -> Tuple[str, Optional[dict]]:
-        # Gemini does not own search — LLMRouter delegates this to Groq/Tavily.
-        return ("", None)
+        """
+        Pre-fetch live web data via Gemini grounded search.
+
+        Called by LLMRouter before routing so search results are available
+        for all tiers (Gemini, GPT, Claude, Groq).  Previously this always
+        returned ('', None), leaving T1 without any live data.
+
+        Returns:
+            (formatted_text, None) — None payload because Gemini grounded
+            results arrive as plain text, not a structured payload dict.
+            Callers that expect a Tavily-style dict (frontend search cards)
+            will simply show no cards, which is acceptable.
+        """
+        if not question:
+            return ("", None)
+        try:
+            result = self._gemini_grounded_search(question)
+            return (result, None)
+        except Exception as e:
+            logger.warning("[Gemini] prefetch_web_search failed: %s", e)
+            return ("", None)

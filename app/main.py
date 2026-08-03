@@ -188,8 +188,7 @@ async def lifespan(app: FastAPI):
         vision_service = VisionService()
         logger.info("Vision service initialized successfully")
         
-        logger.info("Initializing background scheduler...")
-        init_scheduler(groq_service)
+        logger.info("Initializing background scheduler... (will be fully wired after Telegram bot starts)")
         logger.info("Initializing Orchestrator and Agents...")
         from app.core.orchestrator.orchestrator import Orchestrator
         from app.agents.research_agent import DeepResearchAgent
@@ -261,6 +260,33 @@ async def lifespan(app: FastAPI):
         from app.telegram_bot import start_telegram_bot
         _telegram_app = await start_telegram_bot(chat_service)
 
+        # Init scheduler AFTER telegram bot so we can pass telegram_app reference
+        # This allows the proactive engine and session idle checker to be fully wired
+        logger.info("Initializing background scheduler (with proactive engine + session checker)...")
+        init_scheduler(
+            groq_service,
+            memory_service=memory_service,
+            chat_service=chat_service,
+            telegram_app=_telegram_app,
+        )
+
+        # ── Remote Dashboard (opt-in: DASHBOARD_ENABLED=true) ─────────────────
+        try:
+            from app.dashboard_server import start_dashboard_server, DASHBOARD_ENABLED as _DASH_ENABLED
+            if _DASH_ENABLED:
+                import app.scheduler as _sched_mod
+                await start_dashboard_server(
+                    chat_service=chat_service,
+                    memory_service=memory_service,
+                    scheduler_module=_sched_mod,
+                )
+                logger.info("[DASHBOARD] Remote dashboard server started on port 8001")
+            else:
+                logger.info("[DASHBOARD] Disabled (set DASHBOARD_ENABLED=true in .env to enable)")
+        except Exception as e:
+            logger.warning("[DASHBOARD] Could not start dashboard server: %s", e)
+        # ──────────────────────────────────────────────────────────────
+
         yield
 
     except Exception as e:
@@ -273,6 +299,13 @@ async def lifespan(app: FastAPI):
             _tts_pool.shutdown(wait=True)
         except Exception as e:
             logger.error(f"Error shutting down TTS pool: {e}")
+
+        # Stop dashboard server
+        try:
+            from app.dashboard_server import stop_dashboard_server
+            await stop_dashboard_server()
+        except Exception as e:
+            logger.debug("[DASHBOARD] Shutdown: %s", e)
 
         if task_manager:
             try:
@@ -583,10 +616,25 @@ async def api_info():
             "/chat/history/{session_id}": "Get chat history",
             "/tasks/{task_id}": "Get background task status and result",
             "/health": "System health check",
+            "/system/health": "Hardware health (CPU/RAM/disk/temps) — on-demand, no background polling",
             "/tts": "Text-to-speech (POST text, returns streamed MP3)",
             "/stt": "Speech-to-text (POST audio file, returns transcribed text via Groq Whisper)",
         }
     }
+
+
+@app.get("/system/health")
+async def get_system_health():
+    """
+    On-demand hardware health snapshot — CPU%, RAM%, disk usage, temperatures.
+
+    Returns a JSON snapshot from HardwareMonitor.  No background polling —
+    this is intentionally request-driven to avoid notification spam.
+    Temperature data is available on Linux/macOS; returns empty on Windows
+    (psutil limitation — WMI not exposed cross-platform).
+    """
+    from app.services.hardware_monitor import get_hardware_snapshot
+    return get_hardware_snapshot()
 
 @app.get("/dashboard")
 async def get_dashboard():

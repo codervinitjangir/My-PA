@@ -1,5 +1,6 @@
 # jarvis_desktop/app/services/backend_service.py
 
+from rich import json
 import asyncio
 import os
 import httpx

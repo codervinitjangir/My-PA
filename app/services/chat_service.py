@@ -52,6 +52,10 @@ class ChatService:
         self.session_presets: Dict[str, str] = {}
         self.last_metrics: Dict[str, Dict[str, int]] = {}
         self._save_lock = Lock()
+        # Tracks last user-message time per session (used by session idle checker)
+        self._session_last_activity: Dict[str, float] = {}
+        # Sessions already summarized by the idle checker (prevent double-summarizing)
+        self._session_summarized: set = set()
 
     def set_preset(self, preset_name: str, session_id: str = None):
         if session_id:
@@ -242,6 +246,13 @@ class ChatService:
     def add_message(self, session_id: str, role: str, content: str):
         if session_id not in self.sessions:
             self.sessions[session_id] = []
+
+        # Stamp activity time on every user message so the session idle checker
+        # can detect when a session has been quiet for 30+ minutes
+        if role == "user":
+            self._session_last_activity[session_id] = time.time()
+            # If this session was marked summarized, it's active again — reset flag
+            self._session_summarized.discard(session_id)
             
         if len(self.sessions[session_id]) == 0 and role == "user" and self.memory_service:
             self.memory_service.check_usage_patterns(self.groq_service)

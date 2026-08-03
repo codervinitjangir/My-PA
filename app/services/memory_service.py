@@ -57,6 +57,16 @@ class MemoryService:
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                # Session-end summaries table (one-shot consume pattern, inspired by Mark-L)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS session_summaries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        consumed BOOLEAN DEFAULT 0
+                    )
+                """)
                 # Try to add date_reference column if it doesn't exist
                 try:
                     cursor.execute("ALTER TABLE knowledge ADD COLUMN date_reference TEXT")
@@ -464,6 +474,90 @@ class MemoryService:
                 self.store_knowledge(resp, llm_router, date_reference=date_ref)
         except Exception as e:
             logger.debug(f"[MEMORY] Passive extraction failed silently: {e}")
+
+    def end_session_summary(self, session_id: str, messages: List[any], llm_router) -> Optional[str]:
+        """
+        Called when a session has been idle for 30+ minutes.
+        Summarises the session into 1-2 sentences via the LLM router and stores
+        it in session_summaries as unconsumed. Inspired by Mark-L's session
+        save_session_summary pattern but backed by SQLite for persistence.
+        Returns the summary string on success, None on failure.
+        """
+        if not messages:
+            return None
+
+        # Only include user/assistant turns — skip system messages
+        turns = [
+            f"{msg.role}: {msg.content}"
+            for msg in messages
+            if getattr(msg, 'role', '') in ('user', 'assistant')
+        ]
+        if len(turns) < 2:
+            logger.info("[MEMORY] Session %s too short for end-session summary (%d turns).", session_id, len(turns))
+            return None
+
+        history_text = "\n".join(turns[-30:])  # cap at last 30 turns to keep prompt sane
+
+        prompt = (
+            "You are JARVIS. Summarise the following conversation in exactly 1-2 sentences "
+            "(max 80 words). Capture the key topic and any important outcome or decision. "
+            "Write in third person past tense (e.g., 'The user asked about...'). "
+            "Do NOT include greetings or filler.\n\n"
+            f"Conversation:\n{history_text}"
+        )
+
+        try:
+            summary = llm_router.get_response(prompt).strip()
+            if not summary or len(summary) < 10:
+                return None
+
+            summary = summary[:300]  # hard cap to keep DB clean
+
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO session_summaries (session_id, summary, consumed) VALUES (?, ?, 0)",
+                    (session_id, summary)
+                )
+                conn.commit()
+                logger.info("[MEMORY] Stored end-of-session summary for session %s", session_id[:12])
+
+            return summary
+        except Exception as e:
+            logger.error("[MEMORY] end_session_summary failed for session %s: %s", session_id[:12], e)
+            return None
+
+    def pop_latest_session_summary(self) -> Optional[str]:
+        """
+        Atomically fetches the single most recent unconsumed session summary
+        and marks it consumed=1. Returns None if none exist.
+        Inspired by Mark-L's pop_last_session() consume-and-remove pattern,
+        but uses a consumed flag instead of deletion so we keep history for debugging.
+        """
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, summary FROM session_summaries
+                    WHERE consumed = 0
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """)
+                row = cursor.fetchone()
+                if not row:
+                    return None
+
+                row_id, summary = row
+                cursor.execute(
+                    "UPDATE session_summaries SET consumed = 1 WHERE id = ?",
+                    (row_id,)
+                )
+                conn.commit()
+                logger.info("[MEMORY] Consumed session summary id=%d for briefing.", row_id)
+                return summary
+        except Exception as e:
+            logger.error("[MEMORY] pop_latest_session_summary failed: %s", e)
+            return None
 
 if __name__ == "__main__":
     def test_redaction():
