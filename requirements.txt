@@ -15,12 +15,9 @@ PyYAML>=6.0.1
 # ── System Observer & Cross-Platform Utilities ─────────────────────────────────
 psutil>=5.9.0
 Pillow>=10.2.0
-pycaw>=20230407; sys_platform == 'win32'
-screen-brightness-control>=0.16.0; sys_platform == 'win32'
 
 # ── Voice / Speech Synthesis ───────────────────────────────────────────────────
 edge-tts>=6.1.9
-pygame>=2.5.0
 elevenlabs>=1.0.0
 
 # ── AI / ML Models ─────────────────────────────────────────────────────────────
@@ -48,10 +45,6 @@ beautifulsoup4>=4.12.0
 numpy>=1.26.0
 pandas>=2.1.0
 
-# ── Task Execution & OS Control ────────────────────────────────────────────────
-pyperclip>=1.8.2; sys_platform == 'win32'
-keyboard>=0.13.5; sys_platform == 'win32'
-pyautogui>=0.9.54; sys_platform == 'win32'
 
 # ── Telegram Bot ──────────────────────────────────────────────────────────────
 python-telegram-bot>=20.7
