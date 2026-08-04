@@ -31,9 +31,12 @@ def restore_google_credentials():
     if token_b64:
         try:
             token_path = Path("database/google_token.json")
-            token_path.parent.mkdir(parents=True, exist_ok=True)
-            token_bytes = base64.b64decode(token_b64)
-            token_path.write_bytes(token_bytes)
-            logger.info("[STARTUP] google_token.json restored, size: %d bytes", len(token_bytes))
+            if not token_path.exists():
+                token_path.parent.mkdir(parents=True, exist_ok=True)
+                token_bytes = base64.b64decode(token_b64)
+                token_path.write_bytes(token_bytes)
+                logger.info("[STARTUP] google_token.json restored, size: %d bytes", len(token_bytes))
+            else:
+                logger.info("[STARTUP] google_token.json already exists on disk, skipping env var restore to preserve active refresh token.")
         except Exception as e:
             logger.warning("[CLOUD] Could not restore google_token.json: %s", e)

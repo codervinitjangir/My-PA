@@ -31,20 +31,27 @@ def get_google_credentials():
     logger = logging.getLogger("J.A.R.V.I.S")
     creds = None
 
-    # First check env var for cloud deployments (e.g. Render)
-    google_token_env = os.getenv("GOOGLE_TOKEN_JSON", "").strip()
-    if google_token_env:
-        try:
-            import json
-            info = json.loads(google_token_env)
-            creds = Credentials.from_authorized_user_info(info, SCOPES)
-            logger.info("Loaded Google credentials from GOOGLE_TOKEN_JSON env var.")
-        except Exception as e:
-            logger.error(f"Failed to load GOOGLE_TOKEN_JSON from env: {e}")
-
-    if not creds and os.path.exists(TOKEN_FILE):
+    # First check disk for live, auto-refreshing token
+    if os.path.exists(TOKEN_FILE):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
         logger.info(f"Google Token file exists. Valid: {creds.valid}, Expired: {creds.expired}, Expiry: {creds.expiry}, Has Refresh Token: {bool(creds.refresh_token)}")
+
+    # Fall back to env var ONLY if disk file is missing (e.g. after cloud reboot)
+    if not creds:
+        google_token_env = os.getenv("GOOGLE_TOKEN_JSON", "").strip()
+        if google_token_env:
+            try:
+                import json
+                info = json.loads(google_token_env)
+                creds = Credentials.from_authorized_user_info(info, SCOPES)
+                logger.info("Loaded Google credentials from GOOGLE_TOKEN_JSON env var.")
+                
+                # Immediately save to disk so future queries read from disk instead of stale env var
+                os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
+                with open(TOKEN_FILE, 'w') as token:
+                    token.write(creds.to_json())
+            except Exception as e:
+                logger.error(f"Failed to load GOOGLE_TOKEN_JSON from env: {e}")
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
