@@ -71,9 +71,8 @@ async def generate_briefing(groq_service, memory_service=None):
         calendar_data = cal_tool.execute()
         logger.info("[SCHEDULER] Calendar fetched successfully.")
     except Exception as e:
-        cat, detail = _classify_google_error(e)
-        calendar_data = f"TOOL_ERROR [calendar]: category={cat} | detail={detail}"
-        logger.error("[SCHEDULER] Calendar fetch failed: category=%s | %s", cat, detail)
+        calendar_data = f"Failed to execute google_calendar: {e}"
+        logger.error("[SCHEDULER] Calendar fetch failed: %s", e)
 
     # ── Gmail ────────────────────────────────────────────────────────────────────────
     try:
@@ -81,9 +80,8 @@ async def generate_briefing(groq_service, memory_service=None):
         gmail_data = gmail_tool.execute()
         logger.info("[SCHEDULER] Gmail fetched successfully.")
     except Exception as e:
-        cat, detail = _classify_google_error(e)
-        gmail_data = f"TOOL_ERROR [gmail]: category={cat} | detail={detail}"
-        logger.error("[SCHEDULER] Gmail fetch failed: category=%s | %s", cat, detail)
+        gmail_data = f"Failed to execute gmail_summary: {e}"
+        logger.error("[SCHEDULER] Gmail fetch failed: %s", e)
 
     # ── Session summary (Mark-L-inspired: pop once, never repeat) ──────────────────
     session_summary_block = ""
@@ -104,15 +102,9 @@ async def generate_briefing(groq_service, memory_service=None):
         "(e.g., 'Following up on yesterday\'s session...'). "
         "Keep it under 150 words. Speak as JARVIS from Iron Man.\n\n"
         "CRITICAL INSTRUCTION — Error Honesty Rules:\n"
-        "  If a data source contains TOOL_ERROR, report the real category you were given:\n"
-        "    • auth_expired              → say: the Google authentication token has expired or been revoked\n"
-        "    • auth_missing_credentials  → say: re-authentication is required; the server cannot open a browser\n"
-        "    • network_error             → say: there was a network connectivity issue reaching Google\n"
-        "    • api_error                 → say: the Google API returned an error\n"
-        "    • unknown (...)             → say: an unexpected error occurred\n"
-        "  NEVER say 'browser issues', 'lost browser connectivity', or invent any reason "
-        "that was not explicitly given in the category above. "
-        "Use only the exact category label you received.\n\n"
+        "  If a data source failed to execute and returned an error message, report the exact error provided. "
+        "  NEVER invent any reason that was not explicitly given in the text. "
+        "  For example, if it says 'Google OAuth re-authentication required', say exactly that. Do not say 'browser connectivity issues' unless the error text specifically says that.\n\n"
         f"{session_summary_block}"
         f"Schedule:\n{calendar_data}\n\n"
         f"Emails:\n{gmail_data}"

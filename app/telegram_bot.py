@@ -339,7 +339,6 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"============================")
 
         response, actions = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text)
-        logger.info("[TELEGRAM OUTGOING] chat_id=%s | session_id=%s | response=%r | actions=%r", update.effective_chat.id, session_id, (response or "")[:150], actions)
         
         logger.info(f"=== OUTGOING RESPONSE START ===")
         logger.info(f"Session ID: {session_id}")
