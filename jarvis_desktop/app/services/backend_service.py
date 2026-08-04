@@ -159,6 +159,52 @@ class BackendService(QObject):
                                 flow_steps.append({"step": str(step_count), "title": evt, "detail": str(msg)})
                                 step_count += 1
 
+                            # Extract and safely execute local actions
+                            if "actions" in data and isinstance(data["actions"], dict):
+                                actions = data["actions"]
+                                import webbrowser
+                                import os
+                                import sys
+                                # Ensure we can import from app.core.security
+                                if ".." not in sys.path and "." not in sys.path:
+                                    sys.path.append(os.path.abspath("."))
+                                try:
+                                    from app.core.security.allowlist import is_safe_url, is_safe_app_target
+                                except ImportError:
+                                    # Fallback strict functions if import fails
+                                    is_safe_url = lambda u: (u.startswith("http"), u)
+                                    is_safe_app_target = lambda a: (False, "Security import failed")
+
+                                # Handle web links and app protocol launches
+                                for url in actions.get("wopens", []) + actions.get("plays", []) + actions.get("googlesearches", []) + actions.get("youtubesearches", []):
+                                    if url.startswith("http"):
+                                        safe, target = is_safe_url(url)
+                                        if safe:
+                                            webbrowser.open(target)
+                                        else:
+                                            print(f"[BackendService] Blocked unsafe URL: {url} - {target}")
+                                    elif url.startswith("app:"):
+                                        app_name = url.split(":", 1)[1]
+                                        safe, target = is_safe_app_target(app_name)
+                                        if safe:
+                                            try:
+                                                os.system(f"start {target}")
+                                            except Exception as e:
+                                                print(f"[BackendService] App launch error: {e}")
+                                        else:
+                                            print(f"[BackendService] Blocked unsafe App: {app_name} - {target}")
+                                            
+                                # Handle explicit desktop apps
+                                for app in actions.get("desktop_apps", []):
+                                    safe, target = is_safe_app_target(app)
+                                    if safe:
+                                        try:
+                                            os.system(f"start {target}")
+                                        except Exception as e:
+                                            print(f"[BackendService] App launch error: {e}")
+                                    else:
+                                        print(f"[BackendService] Blocked unsafe App: {app} - {target}")
+
                             if data.get("done") is True and not data.get("chunk"):
                                 break
                         except Exception:

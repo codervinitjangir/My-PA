@@ -701,7 +701,12 @@ async def proactive_check():
     Returns a proactive message if the engine decides to speak.
     """
     from app.services.proactive_engine import ProactiveEngine
-    engine = ProactiveEngine()
+    from app.core.models.llm_provider_manager import LLMProviderManager
+    
+    manager = LLMProviderManager()
+    provider = manager.get_default_provider()
+    
+    engine = ProactiveEngine(provider=provider)
     msg = engine.generate_proactive_message()
     return {"message": msg}
 

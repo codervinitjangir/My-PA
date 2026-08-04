@@ -76,6 +76,19 @@ class MemoryService:
                     cursor.execute("ALTER TABLE knowledge ADD COLUMN followed_up BOOLEAN DEFAULT 0")
                 except sqlite3.OperationalError:
                     pass
+                
+                # Table for pending user confirmations of contradictions
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS pending_contradictions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        existing_knowledge_id INTEGER NOT NULL,
+                        category TEXT NOT NULL,
+                        new_content TEXT NOT NULL,
+                        explanation TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
                 conn.commit()
                 logger.info("[MEMORY] SQLite DB initialized at %s", self.db_path)
         except Exception as e:
@@ -158,7 +171,7 @@ class MemoryService:
             logger.error("[MEMORY] Summarisation failed: %s", e)
             return None
 
-    def store_knowledge(self, content: str, llm_router, force_update_id: int = None, force_category: str = None, date_reference: str = None) -> str:
+    def store_knowledge(self, content: str, llm_router, force_update_id: int = None, force_category: str = None, date_reference: str = None, is_passive: bool = False) -> str:
         try:
             content = redact_text(content)
             
@@ -222,7 +235,15 @@ class MemoryService:
                         elif resp.startswith('```'): resp = resp[3:-3]
                         parsed = json.loads(resp)
                         if parsed.get("contradicts") and parsed.get("explanation"):
-                            return f"__CONTRADICT__:{best_match_id}:{category}:{content}::{parsed.get('explanation')}"
+                            if is_passive:
+                                cursor.execute(
+                                    "INSERT INTO pending_contradictions (existing_knowledge_id, category, new_content, explanation) VALUES (?, ?, ?, ?)",
+                                    (best_match_id, category, content, parsed.get('explanation'))
+                                )
+                                conn.commit()
+                                return "Contradiction logged for user confirmation."
+                            else:
+                                return f"__CONTRADICT__:{best_match_id}:{category}:{content}::{parsed.get('explanation')}"
                     except Exception as e:
                         logger.error("[MEMORY] Contradiction check failed, failing open: %s", e)
                         
@@ -243,6 +264,36 @@ class MemoryService:
         except Exception as e:
             logger.error("[MEMORY] Store knowledge failed: %s", e)
             return "Failed to store memory due to an error."
+
+    def get_and_clear_pending_contradictions(self) -> Optional[dict]:
+        """Returns the oldest pending contradiction and deletes it from the queue."""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT id, existing_knowledge_id, category, new_content, explanation FROM pending_contradictions ORDER BY id ASC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row:
+                    cursor.execute("DELETE FROM pending_contradictions WHERE id = ?", (row[0],))
+                    conn.commit()
+                    
+                    # Fetch old content for display
+                    cursor.execute("SELECT content FROM knowledge WHERE id = ?", (row[1],))
+                    old_row = cursor.fetchone()
+                    old_content = old_row[0] if old_row else "Unknown"
+                    
+                    return {
+                        "id": row[1],
+                        "category": row[2],
+                        "new_content": row[3],
+                        "old_content": old_content,
+                        "explanation": row[4]
+                    }
+            return None
+        except Exception as e:
+            logger.error("[MEMORY] Failed to get pending contradictions: %s", e)
+            return None
 
     def forget_knowledge(self, keyword: str) -> str:
         try:
@@ -471,7 +522,7 @@ class MemoryService:
                     date_ref = date_ref.strip()
                 
                 logger.info(f"[MEMORY] Passive Fact Extracted: {resp} (Date: {date_ref})")
-                self.store_knowledge(resp, llm_router, date_reference=date_ref)
+                self.store_knowledge(resp, llm_router, date_reference=date_ref, is_passive=True)
         except Exception as e:
             logger.debug(f"[MEMORY] Passive extraction failed silently: {e}")
 

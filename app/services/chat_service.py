@@ -645,6 +645,18 @@ class ChatService:
                 return
             else:
                 prefix = "Okay, I've discarded the new fact and kept the old memory.\n\n"
+
+        # 1.5. Check for newly bubbled up background contradictions
+        elif self.memory_service:
+            bg_conflict = self.memory_service.get_and_clear_pending_contradictions()
+            if bg_conflict:
+                self.pending_memory_updates[session_id] = {
+                    "id": bg_conflict["id"],
+                    "category": bg_conflict["category"],
+                    "content": bg_conflict["new_content"]
+                }
+                yield f"I have that stored differently — you previously noted: '{bg_conflict['old_content']}', but you're now saying: '{bg_conflict['new_content']}'. Should I update this?"
+                return
                 
         # 2. Handle pending irreversible actions
         elif session_id in self.pending_actions:
