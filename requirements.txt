@@ -53,5 +53,12 @@ python-telegram-bot>=20.7
 # ── Background Monitor & News Search (DDG fallback) ───────────────────────────
 duckduckgo-search>=6.0.0
 
+# ── Plugins & External APIs ───────────────────────────────────────────────────
+google-api-python-client>=2.0.0
+google-auth-oauthlib>=1.0.0
+APScheduler>=3.10.0
+dateparser>=1.2.0
+qrcode>=7.4.0
+
 # ── Relay Proxy WAF Bypass ────────────────────────────────────────────────────
 curl_cffi>=0.5.9
