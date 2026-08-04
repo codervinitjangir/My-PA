@@ -41,7 +41,7 @@ langchain-community>=0.2.0
 langchain-core>=0.2.0
 # ── Web Scraping & Agent Browser ───────────────────────────────────────────────
 beautifulsoup4>=4.12.0
-
+tavily-python>=0.3.0
 # ── Data Processing ────────────────────────────────────────────────────────────
 numpy>=1.26.0
 pandas>=2.1.0
