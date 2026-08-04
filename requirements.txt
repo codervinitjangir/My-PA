@@ -35,11 +35,8 @@ black>=23.12.0
 flake8>=7.0.0
 
 # ── Vector Search & RAG ────────────────────────────────────────────────────────
-sentence-transformers>=2.2.2
-faiss-cpu>=1.7.4
 langchain-text-splitters>=0.2.0
 langchain-groq>=0.1.0
-langchain-huggingface>=0.0.3
 langchain-community>=0.2.0
 langchain-core>=0.2.0
 # ── Web Scraping & Agent Browser ───────────────────────────────────────────────
