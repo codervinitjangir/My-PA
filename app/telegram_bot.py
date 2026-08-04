@@ -332,8 +332,20 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         session_id = chat_service.get_or_create_session("telegram")
+        
+        logger.info(f"=== INCOMING REQUEST START ===")
+        logger.info(f"Session ID: {session_id}")
+        logger.info(f"Message Text: {user_text}")
+        logger.info(f"============================")
+
         response, actions = await asyncio.to_thread(consume_jarvis_stream, chat_service, session_id, user_text)
         logger.info("[TELEGRAM OUTGOING] chat_id=%s | session_id=%s | response=%r | actions=%r", update.effective_chat.id, session_id, (response or "")[:150], actions)
+        
+        logger.info(f"=== OUTGOING RESPONSE START ===")
+        logger.info(f"Session ID: {session_id}")
+        logger.info(f"Response: {response}")
+        logger.info(f"============================")
+
         if response:
             await update.message.reply_text(response[:4090])
         
