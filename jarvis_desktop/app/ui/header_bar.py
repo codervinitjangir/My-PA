@@ -139,9 +139,9 @@ class HeaderBar(QFrame):
         mode_layout.setContentsMargins(4, 4, 4, 4)
         mode_layout.setSpacing(6)
 
-        self.btn_jarvis = QPushButton("⚡\uFE0E Jarvis", self.mode_container)
-        self.btn_general = QPushButton("💬\uFE0E General", self.mode_container)
-        self.btn_realtime = QPushButton("🌐\uFE0E Realtime", self.mode_container)
+        self.btn_jarvis = QPushButton("◈ Jarvis", self.mode_container)
+        self.btn_general = QPushButton("▤ General", self.mode_container)
+        self.btn_realtime = QPushButton("◎ Realtime", self.mode_container)
 
         self.mode_btns = {
             "jarvis": self.btn_jarvis,
@@ -203,11 +203,11 @@ class HeaderBar(QFrame):
         right_layout.addWidget(self.status_badge)
 
         # Action Buttons
-        self.activity_btn = QPushButton("📋\uFE0E", self)
+        self.activity_btn = QPushButton("≡", self)
         self.activity_btn.setToolTip("View Activity Flow")
-        self.settings_btn = QPushButton("⚙\uFE0E", self)
+        self.settings_btn = QPushButton("⛭", self)
         self.settings_btn.setToolTip("Settings")
-        self.new_chat_btn = QPushButton("➕\uFE0E", self)
+        self.new_chat_btn = QPushButton("＋", self)
         self.new_chat_btn.setToolTip("New Chat")
 
         for icon_btn in [self.activity_btn, self.settings_btn, self.new_chat_btn]:

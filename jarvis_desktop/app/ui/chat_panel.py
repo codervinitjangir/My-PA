@@ -51,9 +51,9 @@ class ChatPanel(QFrame):
 
         h_layout.addStretch()
 
-        self.btn_search = QPushButton("🔍 SEARCH", session_header)
-        self.btn_settings = QPushButton("⚙ SETTINGS", session_header)
-        self.btn_clear = QPushButton("🗑 CLEAR", session_header)
+        self.btn_search = QPushButton("⌕ SEARCH", session_header)
+        self.btn_settings = QPushButton("⛭ SETTINGS", session_header)
+        self.btn_clear = QPushButton("✕ CLEAR", session_header)
 
         for btn in [self.btn_search, self.btn_settings, self.btn_clear]:
             btn.setCursor(Qt.PointingHandCursor)
