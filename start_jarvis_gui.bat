@@ -3,9 +3,6 @@ echo ===============================================
 echo   J.A.R.V.I.S  Unified Desktop Application
 echo ===============================================
 echo.
-echo Checking dependencies (PySide6, qasync, etc)...
-.\.venv\Scripts\pip install -q -r requirements.txt
-.\.venv\Scripts\pip install -q PySide6 qasync
 
 echo.
 echo Launching GUI and Background Engines...
