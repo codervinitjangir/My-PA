@@ -53,6 +53,7 @@ async def main_async(app: QApplication):
                 is_online = await backend_service.check_health()
                 if is_online:
                     await backend_service.fetch_dashboard()
+                    await backend_service.check_proactive()
             except Exception:
                 pass
             await asyncio.sleep(30)

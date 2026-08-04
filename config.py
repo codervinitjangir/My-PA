@@ -156,9 +156,21 @@ PRESETS = {
 
 def get_system_prompt(preset: str = 'default') -> str:
     base = JARVIS_SYSTEM_PROMPT
+    
+    # 1. Identity Memory Injection
+    try:
+        from app.memory.identity_manager import IdentityManager
+        identity_context = IdentityManager().get_identity_context()
+        if identity_context:
+            base += "\n\n=== USER CONTEXT & IDENTITY ===\n" + identity_context + "\n===============================\n"
+    except Exception as e:
+        import logging
+        logging.getLogger("J.A.R.V.I.S").warning(f"Failed to inject identity context: {e}")
+
+    # 2. Preset Additions
     addition = PRESETS.get(preset, PRESETS['default'])
     if addition:
-        return f"{base}\n\n[PRESET MODE: {preset.upper()}]\n{addition}"
+        return f"{base}\n\n[MODE OVERRIDE: {addition}]"
     return base
 
 GENERAL_CHAT_ADDENDUM = """

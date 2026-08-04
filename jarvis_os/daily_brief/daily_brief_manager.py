@@ -18,7 +18,15 @@ class DailyBriefManager:
             from app.scheduler import LAST_BRIEFING
             if LAST_BRIEFING and LAST_BRIEFING != "No briefing yet.":
                 state.today_focus = LAST_BRIEFING
-        except ImportError:
-            pass
+                
+            # --- Mark-L Session Memory Injection ---
+            from app.services.session_service import SessionService
+            yesterday_summary = SessionService().consume_yesterday_summary()
+            if yesterday_summary:
+                state.today_focus = f"Yesterday's Session: {yesterday_summary}\n\n{state.today_focus}"
+                
+        except Exception as e:
+            import logging
+            logging.getLogger("J.A.R.V.I.S").warning(f"Failed to load morning briefing context: {e}")
             
         return state.model_dump()

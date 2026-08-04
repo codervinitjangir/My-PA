@@ -344,7 +344,20 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Error shutting down telegram bot: {e}")
 
-        logger.info("All sessions saved. Goodbye!")
+        logger.info("All sessions saved. Generating Daily Session Summary...")
+
+        try:
+            from app.services.session_service import SessionService
+            # Get today's chats from sqlite memory
+            from app.db.chat_repo import get_all_chats
+            chats = get_all_chats()
+            if chats:
+                # Format a compressed transcript of the last 100 messages
+                transcript = "\n".join([f"User: {c.user_msg}\nJarvis: {c.ai_msg}" for c in chats[-100:]])
+                SessionService().generate_session_summary(transcript)
+            logger.info("Session Summary complete.")
+        except Exception as e:
+            logger.error(f"Error generating session summary: {e}")
 
         try:
             from jarvis_os.core.usage import flush_usage
@@ -679,6 +692,17 @@ async def get_mobile_state():
         "active_session": True,
         "screen_activity": activity
     }
+
+@app.get("/proactive/check")
+async def proactive_check():
+    """
+    Pinged by the Desktop GUI when the user has been silent.
+    Returns a proactive message if the engine decides to speak.
+    """
+    from app.services.proactive_engine import ProactiveEngine
+    engine = ProactiveEngine()
+    msg = engine.generate_proactive_message()
+    return {"message": msg}
 
 
 @app.get("/briefing")

@@ -34,6 +34,27 @@ class BackendService(QObject):
             "X-JARVIS-Token": auth_token,
         }
         self.client = httpx.AsyncClient(base_url=self.base_url, headers=headers, timeout=30.0)
+        import time
+        self.last_activity = time.time()
+
+    async def check_proactive(self):
+        """Called every 30s by main loop. If silent for 15+ mins, ping proactive engine."""
+        import time
+        if time.time() - self.last_activity > 900:  # 15 mins
+            self.last_activity = time.time() # Reset to avoid spamming
+            try:
+                resp = await self.client.get("/proactive/check")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    msg = data.get("message", "").strip()
+                    if msg:
+                        # Emulate a chat response so the GUI displays and speaks it
+                        self.chat_response_received.emit({
+                            "response": msg,
+                            "flow": []
+                        })
+            except Exception as e:
+                pass
 
     async def check_health(self) -> bool:
         """Ping backend to update status badge quietly"""
@@ -79,6 +100,8 @@ class BackendService(QObject):
 
     async def send_chat_message(self, text: str, mode: str = "jarvis"):
         """Send non-streaming chat message to /chat endpoint"""
+        import time
+        self.last_activity = time.time()
         try:
             print(f"[BackendService] POST http://127.0.0.1:8000/chat | payload: '{text[:50]}' ...")
             payload = {
@@ -100,6 +123,8 @@ class BackendService(QObject):
 
     async def stream_chat_message(self, text: str, mode: str = "jarvis"):
         """Stream real-time token response token-by-token from /chat/jarvis/stream"""
+        import time
+        self.last_activity = time.time()
         try:
             payload = {"message": text, "mode": mode}
             endpoint = "/chat/jarvis/stream" if mode == "jarvis" else "/chat/stream"
