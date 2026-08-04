@@ -70,6 +70,15 @@ async def main_async(app: QApplication):
 def main():
     init_high_dpi()
 
+    # Launch local backend server automatically
+    backend_process = None
+    try:
+        import subprocess
+        backend_process = subprocess.Popen([sys.executable, "run.py"])
+        print("[JARVIS] Auto-started local backend server.")
+    except Exception as e:
+        print(f"[JARVIS] Failed to auto-start backend: {e}")
+
     app = QApplication(sys.argv)
     app.setApplicationName("JARVIS Desktop")
     app.setQuitOnLastWindowClosed(False)
@@ -82,6 +91,10 @@ def main():
             loop.run_until_complete(main_async(app))
     except (KeyboardInterrupt, SystemExit, RuntimeError):
         pass
+    finally:
+        if backend_process:
+            print("[JARVIS] Shutting down local backend server...")
+            backend_process.terminate()
 
 if __name__ == "__main__":
     main()
