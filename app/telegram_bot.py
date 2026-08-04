@@ -698,7 +698,7 @@ async def start_telegram_bot(chat_service):
 
     # Wire proactive engine — stores instance so scheduler can reference it
     from app.services.proactive_engine import ProactiveEngine
-    application.bot_data["proactive_engine"] = ProactiveEngine()
+    application.bot_data["proactive_engine"] = ProactiveEngine(chat_service.groq_service)
     application.bot_data["last_telegram_message_time"] = None  # None until first message
     
     application.add_handler(CommandHandler("start", start_command))

@@ -13,10 +13,9 @@ class ProactiveEngine:
       - Active projects awareness (from IdentityManager)
       - Non-repetitive rotation
     """
-    def __init__(self):
+    def __init__(self, provider):
         self._rotation = 0
-        from app.providers.groq_provider import GroqProvider
-        self.provider = GroqProvider()
+        self.provider = provider
 
     def generate_proactive_message(self) -> str:
         """
