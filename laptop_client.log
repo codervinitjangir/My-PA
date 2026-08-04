@@ -951,3 +951,117 @@ For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/St
 20:39:29 | WARNING  | [WS] Closed with error: no close frame received or sent
 20:39:34 | INFO     | [WS] Connecting to wss://jarvis-mcaj.onrender.com/laptop/ws?token=testkey ...
 20:39:37 | INFO     | [WS] Connected to JARVIS server!
+18:23:57 | INFO     | [AUDIO-PLAYER] OutputStream initialized (24000Hz, 1ch)
+18:23:57 | INFO     | [WS] Connecting to wss://jarvis-mcaj.onrender.com/laptop/ws?token=testkey ...
+18:23:58 | INFO     | [WS] Connected to JARVIS server!
+18:24:03 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+18:24:04 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+18:24:05 | INFO     | [WAKE] Input stream started.
+18:24:20 | INFO     | [WAKE] Partial match score: 0.34
+18:24:20 | INFO     | [WAKE] Partial match score: 0.36
+18:24:20 | INFO     | [WAKE] Partial match score: 0.22
+18:24:39 | INFO     | [WAKE] Partial match score: 0.24
+18:24:39 | INFO     | [WAKE] Partial match score: 0.40
+18:24:39 | INFO     | [WAKE] Partial match score: 0.20
+18:24:39 | INFO     | [WAKE] Partial match score: 0.29
+18:24:47 | INFO     | [WAKE] Partial match score: 0.30
+18:24:50 | INFO     | [WAKE] Partial match score: 0.40
+18:24:50 | INFO     | [WAKE] Partial match score: 0.23
+18:24:52 | INFO     | [WAKE] Partial match score: 0.38
+18:24:53 | INFO     | [WAKE] Partial match score: 0.41
+18:24:53 | INFO     | [WAKE] Partial match score: 0.47
+18:24:53 | INFO     | [WAKE] Wake word detected! (Score: 0.47)
+18:24:53 | INFO     | [WAKE] Recording (Adaptive VAD 300ms tail active)...
+18:24:56 | INFO     | [WAKE] Adaptive VAD tail detected silence, stopping recording.
+18:24:56 | INFO     | [AUDIO] Uploading WAV: size=112684 bytes (~3.5s of audio, uncompressed PCM)
+18:24:58 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/stt "HTTP/1.1 200 OK"
+18:24:58 | INFO     | [NETWORK] STT: rtt=1447ms | server_processing=266ms | network_overhead=1181ms
+18:24:58 | INFO     | [WAKE] Recognized (raw): How are you and what are you doing now
+18:24:58 | INFO     | [WAKE] Command after stripping wake word: How are you and what are you doing now
+18:24:59 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/chat "HTTP/1.1 200 OK"
+18:24:59 | INFO     | [NETWORK] Chat: rtt=1841ms | server_llm=0ms | network+overhead=1841ms
+18:24:59 | INFO     | [WAKE] JARVIS replied: I'm doing great, just chillin' in the digital realm. Currently, I've got my eyes on your laptop, making sure everything is running smoothly. What about you, Boss? How's your Saturday going?
+18:25:00 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/tts "HTTP/1.1 200 OK"
+18:25:00 | INFO     | [LATENCY] VAD=202ms STT=1447ms LLM_first=0ms TTS_first=871ms Total=4372ms
+18:27:00 | INFO     | [WAKE] Partial match score: 0.33
+18:27:00 | INFO     | [WAKE] Partial match score: 0.36
+18:27:02 | INFO     | [WAKE] Partial match score: 0.26
+18:27:02 | INFO     | [WAKE] Partial match score: 0.29
+18:27:04 | INFO     | [WAKE] Partial match score: 0.43
+18:27:04 | INFO     | [WAKE] Wake word detected! (Score: 0.43)
+18:27:04 | INFO     | [WAKE] Recording (Adaptive VAD 300ms tail active)...
+18:27:08 | INFO     | [WAKE] Adaptive VAD tail detected silence, stopping recording.
+18:27:08 | INFO     | [AUDIO] Uploading WAV: size=98348 bytes (~3.1s of audio, uncompressed PCM)
+18:27:16 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/stt "HTTP/1.1 200 OK"
+18:27:16 | INFO     | [NETWORK] STT: rtt=8286ms | server_processing=276ms | network_overhead=8010ms
+18:27:16 | INFO     | [WAKE] Recognized (raw): How are you going to open youtube for me
+18:27:16 | INFO     | [WAKE] Command after stripping wake word: How are you going to open youtube for me
+18:27:17 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/chat "HTTP/1.1 200 OK"
+18:27:17 | INFO     | [NETWORK] Chat: rtt=1590ms | server_llm=0ms | network+overhead=1590ms
+18:27:17 | INFO     | [WAKE] JARVIS replied: I've opened YouTube for you.
+18:27:18 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/tts "HTTP/1.1 200 OK"
+18:27:18 | INFO     | [LATENCY] VAD=188ms STT=8286ms LLM_first=0ms TTS_first=812ms Total=10879ms
+18:27:18 | INFO     | [WAKE] Partial match score: 0.23
+18:27:19 | INFO     | [WAKE] Partial match score: 0.36
+18:27:19 | INFO     | [WAKE] Partial match score: 0.24
+18:27:19 | INFO     | [WAKE] Partial match score: 0.21
+20:08:16 | INFO     | [AUDIO-PLAYER] OutputStream initialized (24000Hz, 1ch)
+20:08:16 | INFO     | [WS] Connecting to wss://jarvis-mcaj.onrender.com/laptop/ws?token=testkey ...
+20:08:17 | INFO     | [WS] Connected to JARVIS server!
+20:08:19 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+20:08:19 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+20:08:20 | INFO     | [WAKE] Input stream started.
+20:08:51 | INFO     | [WAKE] Partial match score: 0.49
+20:08:51 | INFO     | [WAKE] Wake word detected! (Score: 0.49)
+20:08:51 | INFO     | [WAKE] Recording (Adaptive VAD 300ms tail active)...
+20:08:54 | INFO     | [WAKE] Adaptive VAD tail detected silence, stopping recording.
+20:08:54 | INFO     | [AUDIO] Uploading WAV: size=122924 bytes (~3.8s of audio, uncompressed PCM)
+20:08:56 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/stt "HTTP/1.1 200 OK"
+20:08:56 | INFO     | [NETWORK] STT: rtt=1390ms | server_processing=268ms | network_overhead=1122ms
+20:08:56 | INFO     | [WAKE] Recognized (raw): Alaino
+20:08:56 | INFO     | [WAKE] Command after stripping wake word: Alaino
+20:08:58 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/chat "HTTP/1.1 200 OK"
+20:08:58 | INFO     | [NETWORK] Chat: rtt=1849ms | server_llm=0ms | network+overhead=1849ms
+20:08:58 | INFO     | [WAKE] JARVIS replied: Who's Alaino?
+20:08:58 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/tts "HTTP/1.1 200 OK"
+20:08:59 | INFO     | [LATENCY] VAD=210ms STT=1390ms LLM_first=0ms TTS_first=1002ms Total=4468ms
+20:08:59 | INFO     | [WAKE] Partial match score: 0.51
+20:08:59 | INFO     | [WAKE] Wake word detected! (Score: 0.51)
+20:08:59 | INFO     | [WAKE] Recording (Adaptive VAD 300ms tail active)...
+20:09:03 | INFO     | [WAKE] Adaptive VAD tail detected silence, stopping recording.
+20:09:03 | INFO     | [AUDIO] Uploading WAV: size=122924 bytes (~3.8s of audio, uncompressed PCM)
+20:09:05 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/stt "HTTP/1.1 200 OK"
+20:09:05 | INFO     | [NETWORK] STT: rtt=1999ms | server_processing=267ms | network_overhead=1732ms
+20:09:05 | INFO     | [WAKE] Recognized (raw): and you can see the next one
+20:09:05 | INFO     | [WAKE] Command after stripping wake word: and you can see the next one
+20:09:06 | INFO     | [SCREEN] Screenshot captured (304703 bytes)
+20:09:08 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/chat "HTTP/1.1 200 OK"
+20:09:08 | INFO     | [NETWORK] Chat: rtt=3274ms | server_llm=0ms | network+overhead=3274ms
+20:09:08 | INFO     | [WAKE] JARVIS replied: I couldn't analyze that image. Please try again.
+20:09:08 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/tts "HTTP/1.1 200 OK"
+20:09:09 | INFO     | [LATENCY] VAD=206ms STT=1999ms LLM_first=0ms TTS_first=1330ms Total=6812ms
+20:09:10 | INFO     | [WAKE] Partial match score: 0.50
+20:09:10 | INFO     | [WAKE] Wake word detected! (Score: 0.50)
+20:09:10 | INFO     | [WAKE] Recording (Adaptive VAD 300ms tail active)...
+20:09:14 | INFO     | [AUDIO] Uploading WAV: size=153644 bytes (~4.8s of audio, uncompressed PCM)
+20:09:15 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/stt "HTTP/1.1 200 OK"
+20:09:15 | INFO     | [NETWORK] STT: rtt=806ms | server_processing=291ms | network_overhead=515ms
+20:09:15 | INFO     | [WAKE] Recognized (raw): Thank you
+20:09:15 | INFO     | [WAKE] Command after stripping wake word: Thank you
+20:09:17 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/chat "HTTP/1.1 200 OK"
+20:09:17 | INFO     | [NETWORK] Chat: rtt=1390ms | server_llm=0ms | network+overhead=1390ms
+20:09:17 | INFO     | [WAKE] JARVIS replied: No prob, boss
+20:09:17 | INFO     | HTTP Request: POST https://jarvis-mcaj.onrender.com/tts "HTTP/1.1 200 OK"
+20:09:17 | INFO     | [LATENCY] VAD=4739ms STT=806ms LLM_first=0ms TTS_first=635ms Total=7576ms
+20:09:18 | INFO     | [WAKE] Partial match score: 0.34
+20:13:11 | INFO     | [WAKE] Partial match score: 0.34
+20:13:11 | INFO     | [WAKE] Partial match score: 0.27
+22:30:04 | INFO     | [AUDIO-PLAYER] OutputStream initialized (24000Hz, 1ch)
+22:30:04 | INFO     | [WS] Connecting to wss://jarvis-mcaj.onrender.com/laptop/ws?token=testkey ...
+22:30:04 | INFO     | [WS] Connected to JARVIS server!
+22:30:07 | INFO     | [WAKE] Loading openwakeword model 'hey_jarvis'...
+22:30:07 | INFO     | [WAKE] Model loaded. Monitoring microphone...
+22:30:08 | INFO     | [WAKE] Input stream started.
+22:40:09 | WARNING  | [WS] Closed with error: no close frame received or sent
+22:40:14 | INFO     | [WS] Connecting to wss://jarvis-mcaj.onrender.com/laptop/ws?token=testkey ...
+22:40:15 | INFO     | [WS] Connected to JARVIS server!

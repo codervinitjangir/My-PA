@@ -1,5 +1,5 @@
 {
-  "dashboard_open": 424,
+  "dashboard_open": 581,
   "morning_brief": 14,
   "screen_analysis": 6,
   "session_resume": 0,
@@ -72,12 +72,33 @@
     "2026-07-22": {
       "presence_open": 13,
       "presence_hide": 2
+    },
+    "2026-07-25": {
+      "presence_open": 6,
+      "dashboard_open": 1
+    },
+    "2026-07-30": {
+      "presence_open": 1,
+      "dashboard_open": 4
+    },
+    "2026-07-31": {
+      "dashboard_open": 4
+    },
+    "2026-08-02": {
+      "dashboard_open": 70
+    },
+    "2026-08-03": {
+      "presence_open": 1,
+      "dashboard_open": 17
+    },
+    "2026-08-04": {
+      "dashboard_open": 61
     }
   },
   "web_open": 0,
   "web_search": 0,
   "web_summarize": 0,
-  "presence_open": 74,
+  "presence_open": 82,
   "presence_hide": 19,
   "presence_brief": 12,
   "presence_dashboard": 5,
