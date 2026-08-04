@@ -838,7 +838,6 @@ class ChatService:
         executor = ThreadPoolExecutor(max_workers=2)
         try:
             future_brain = executor.submit(_run_brain)
-            future_search = executor.submit(_run_search)
 
             try:
                 brain_res = future_brain.result(timeout=JARVIS_BRAIN_SEARCH_TIMEOUT)
@@ -864,10 +863,10 @@ class ChatService:
 
             if query_type in ("general", "casual_chat"):
                 formatted_results, search_payload = "", None
-                # We do not wait for future_search here.
 
             else:
                 try:
+                    future_search = executor.submit(_run_search)
                     formatted_results, search_payload = future_search.result(
                         timeout=JARVIS_BRAIN_SEARCH_TIMEOUT
                     )
