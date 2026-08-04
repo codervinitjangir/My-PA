@@ -318,11 +318,39 @@ class BrainService:
             _TASK_BRAIN_PROMPT, user_content, key_index)
 
         decisions = self._parse_task_decisions(raw_response)
-        self._last_task_decisions = decisions
-        task_types = [d[0] for d in decisions]
+        
+        # Option A validation: Verify extracted targets aren't hallucinations
+        validated_decisions = []
+        msg_lower = msg.lower()
+        
+        for task_type, query in decisions:
+            if not query:
+                validated_decisions.append((task_type, query))
+                continue
+                
+            # Filter to meaningful words (len > 2)
+            query_words = [w.lower() for w in query.split() if len(w) > 2]
+            
+            if not query_words:
+                validated_decisions.append((task_type, query))
+                continue
+                
+            # Check if at least one meaningful word is in the original message
+            if not any(w in msg_lower for w in query_words):
+                logger.warning("[BRAIN] Hallucination detected! Extracted query '%s' shares no keywords with original message '%s'.", query, msg[:50])
+                continue
+                
+            validated_decisions.append((task_type, query))
+
+        if not validated_decisions:
+            self._last_task_decisions = []
+            return ([], "rule-based", 0)
+            
+        self._last_task_decisions = validated_decisions
+        task_types = [d[0] for d in validated_decisions]
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        logger.info("[BRAIN-TASK] '%s' -> %s (%d ms, %s)", msg[:50], decisions, elapsed_ms, method)
+        logger.info("[BRAIN-TASK] '%s' -> %s (%d ms, %s)", msg[:50], self._last_task_decisions, elapsed_ms, method)
         logger.info("[BRAIN-TASK-RAW-RESPONSE] %s", raw_response)
         return (task_types, method, elapsed_ms)
 
@@ -333,14 +361,6 @@ class BrainService:
         key_index: int = 0,
     ) -> Tuple[str, List[str], str, int, dict]:
         category, method1, ms1, intent_dict = self.classify_primary(user_message, chat_history, key_index)
-
-        confidence = intent_dict.get("confidence", 1.0)
-        
-        # Intercept low confidence or ambiguous task classifications and force them to chat
-        if confidence < 0.7 and category in ("task", "automation", "mixed"):
-            logger.warning("[BRAIN] Low intent confidence (%.2f) for '%s'. Falling back to casual_chat to ask for clarification.", confidence, category)
-            category = "casual_chat"
-            intent_dict["legacy_route"] = "casual_chat"
 
         if category in ("task", "mixed"):
             task_types, method2, ms2 = self.classify_task(user_message, chat_history, key_index)
