@@ -236,7 +236,14 @@ class BrainService:
             category = "general"
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        logger.info("[BRAIN-PRIMARY] %s -> %s (%d ms, %s)", msg[:50], category, elapsed_ms, method)
+        
+        intent = parsed_json.get("intent", "UNKNOWN")
+        confidence = parsed_json.get("confidence", 0.0)
+        
+        logger.info("[BRAIN-PRIMARY] '%s' -> legacy_route=%s | intent=%s | confidence=%.2f (%d ms, %s)", 
+                    msg[:50], category, intent, confidence, elapsed_ms, method)
+        logger.info("[BRAIN-PRIMARY-RAW-JSON] %s", parsed_json)
+        
         return (category, method, elapsed_ms, parsed_json)
 
     _TASK_FEW_SHOTS = [
@@ -315,7 +322,8 @@ class BrainService:
         task_types = [d[0] for d in decisions]
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        logger.info("[BRAIN-TASK] %s -> %s (%d ms, %s)", msg[:50], decisions, elapsed_ms, method)
+        logger.info("[BRAIN-TASK] '%s' -> %s (%d ms, %s)", msg[:50], decisions, elapsed_ms, method)
+        logger.info("[BRAIN-TASK-RAW-RESPONSE] %s", raw_response)
         return (task_types, method, elapsed_ms)
 
     def classify(
@@ -325,6 +333,14 @@ class BrainService:
         key_index: int = 0,
     ) -> Tuple[str, List[str], str, int, dict]:
         category, method1, ms1, intent_dict = self.classify_primary(user_message, chat_history, key_index)
+
+        confidence = intent_dict.get("confidence", 1.0)
+        
+        # Intercept low confidence or ambiguous task classifications and force them to chat
+        if confidence < 0.7 and category in ("task", "automation", "mixed"):
+            logger.warning("[BRAIN] Low intent confidence (%.2f) for '%s'. Falling back to casual_chat to ask for clarification.", confidence, category)
+            category = "casual_chat"
+            intent_dict["legacy_route"] = "casual_chat"
 
         if category in ("task", "mixed"):
             task_types, method2, ms2 = self.classify_task(user_message, chat_history, key_index)
