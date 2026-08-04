@@ -172,24 +172,7 @@ class OrbWidget(QWidget):
         p.setPen(self._status_color)
         p.drawText(QPointF(start_x + 14, status_y), self._status_text)
 
-        # ── 10. Model Badge Below Status ────────────────────────────────────
-        badge_y = status_y + 18
-        badge_font = QFont("Segoe UI", 9, QFont.Weight.Medium)
-        badge_font.setLetterSpacing(QFont.AbsoluteSpacing, 1.0)
-        p.setFont(badge_font)
-        bfm = QFontMetrics(badge_font)
-        badge_text = f"◆  {self._model_text}"
-        btw = bfm.horizontalAdvance(badge_text)
-        bth = bfm.height()
-        bpad_x = 12
-        bpad_y = 3
-        badge_rect = QRectF(cx - btw / 2 - bpad_x, badge_y - bpad_y - 2, btw + bpad_x * 2, bth + bpad_y)
-        
-        p.setBrush(QColor(0, 229, 204, 15))
-        p.setPen(QPen(QColor(0, 229, 204, 50), 0.8))
-        p.drawRoundedRect(badge_rect, 8, 8)
-        p.setPen(QColor(0, 229, 204, 150))
-        p.drawText(QPointF(cx - btw / 2, badge_y + bfm.ascent() * 0.6), badge_text)
+        # ── 10. Model Badge Below Status (REMOVED) ─────────────────────────
 
         p.end()
 
