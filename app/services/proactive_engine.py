@@ -15,7 +15,8 @@ class ProactiveEngine:
     """
     def __init__(self):
         self._rotation = 0
-        self.router = LLMRouter()
+        from app.providers.groq_provider import GroqProvider
+        self.provider = GroqProvider()
 
     def generate_proactive_message(self) -> str:
         """
@@ -68,7 +69,7 @@ class ProactiveEngine:
 
         try:
             # Groq is fastest for proactive generation
-            resp = self.router.groq_provider.get_response(
+            resp = self.provider.get_response(
                 question=prompt,
                 chat_history=[],
                 use_search=False

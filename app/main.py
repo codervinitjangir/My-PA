@@ -348,13 +348,14 @@ async def lifespan(app: FastAPI):
 
         try:
             from app.services.session_service import SessionService
-            # Get today's chats from sqlite memory
-            from app.db.chat_repo import get_all_chats
-            chats = get_all_chats()
-            if chats:
-                # Format a compressed transcript of the last 100 messages
-                transcript = "\n".join([f"User: {c.user_msg}\nJarvis: {c.ai_msg}" for c in chats[-100:]])
-                SessionService().generate_session_summary(transcript)
+            if chat_service and chat_service.sessions:
+                # Get the last 100 messages from all active sessions
+                all_msgs = []
+                for msgs in chat_service.sessions.values():
+                    all_msgs.extend(msgs[-100:])
+                if all_msgs:
+                    transcript = "\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in all_msgs[-100:]])
+                    SessionService().generate_session_summary(transcript)
             logger.info("Session Summary complete.")
         except Exception as e:
             logger.error(f"Error generating session summary: {e}")
