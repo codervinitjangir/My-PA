@@ -85,9 +85,15 @@ class MemoryService:
                         category TEXT NOT NULL,
                         new_content TEXT NOT NULL,
                         explanation TEXT NOT NULL,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        session_id TEXT
                     )
                 """)
+                
+                try:
+                    cursor.execute("ALTER TABLE pending_contradictions ADD COLUMN session_id TEXT")
+                except sqlite3.OperationalError:
+                    pass
                 
                 conn.commit()
                 logger.info("[MEMORY] SQLite DB initialized at %s", self.db_path)
@@ -265,17 +271,19 @@ class MemoryService:
             logger.error("[MEMORY] Store knowledge failed: %s", e)
             return "Failed to store memory due to an error."
 
-    def get_and_clear_pending_contradictions(self) -> Optional[dict]:
-        """Returns the oldest pending contradiction and deletes it from the queue."""
+    def get_and_claim_pending_contradiction(self, session_id: str) -> Optional[dict]:
+        """Returns the oldest unclaimed pending contradiction and marks it as claimed by the session."""
         try:
             with self._get_conn() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT id, existing_knowledge_id, category, new_content, explanation FROM pending_contradictions ORDER BY id ASC LIMIT 1"
+                    "SELECT id, existing_knowledge_id, category, new_content, explanation FROM pending_contradictions WHERE session_id IS NULL OR session_id = ? ORDER BY id ASC LIMIT 1",
+                    (session_id,)
                 )
                 row = cursor.fetchone()
                 if row:
-                    cursor.execute("DELETE FROM pending_contradictions WHERE id = ?", (row[0],))
+                    pending_id = row[0]
+                    cursor.execute("UPDATE pending_contradictions SET session_id = ? WHERE id = ?", (session_id, pending_id))
                     conn.commit()
                     
                     # Fetch old content for display
@@ -284,6 +292,7 @@ class MemoryService:
                     old_content = old_row[0] if old_row else "Unknown"
                     
                     return {
+                        "pending_id": pending_id,
                         "id": row[1],
                         "category": row[2],
                         "new_content": row[3],
@@ -294,6 +303,15 @@ class MemoryService:
         except Exception as e:
             logger.error("[MEMORY] Failed to get pending contradictions: %s", e)
             return None
+
+    def delete_pending_contradiction(self, pending_id: int):
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM pending_contradictions WHERE id = ?", (pending_id,))
+                conn.commit()
+        except Exception as e:
+            logger.error("[MEMORY] Failed to delete pending contradiction: %s", e)
 
     def forget_knowledge(self, keyword: str) -> str:
         try:

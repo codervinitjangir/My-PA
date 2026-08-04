@@ -188,7 +188,7 @@ class BackendService(QObject):
                                         safe, target = is_safe_app_target(app_name)
                                         if safe:
                                             try:
-                                                os.system(f"start {target}")
+                                                os.startfile(target)
                                             except Exception as e:
                                                 print(f"[BackendService] App launch error: {e}")
                                         else:
@@ -199,7 +199,7 @@ class BackendService(QObject):
                                     safe, target = is_safe_app_target(app)
                                     if safe:
                                         try:
-                                            os.system(f"start {target}")
+                                            os.startfile(target)
                                         except Exception as e:
                                             print(f"[BackendService] App launch error: {e}")
                                     else:

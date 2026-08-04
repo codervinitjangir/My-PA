@@ -628,9 +628,23 @@ class ChatService:
         msg_lower = clean_user_message.lower().strip()
         prefix = ""
         
-        # 1. Handle pending memory updates (Contradictions)
-        if session_id in self.pending_memory_updates:
+        # 1. Handle pending irreversible actions FIRST (Security)
+        if session_id in self.pending_actions:
+            pending_action = self.pending_actions.pop(session_id)
+            if msg_lower in ("yes", "y", "yeah", "do it", "sure", "confirm"):
+                from app.services.action_broker import ActionBroker
+                res = ActionBroker.dispatch(pending_action['tool'], pending_action['args'], confirmed=True)
+                yield f"Action completed: {res}"
+                return
+            else:
+                prefix = "Action cancelled.\n\n"
+
+        # 2. Handle pending memory updates (Contradictions)
+        elif session_id in self.pending_memory_updates:
             pending = self.pending_memory_updates.pop(session_id)
+            if self.memory_service and "pending_id" in pending:
+                self.memory_service.delete_pending_contradiction(pending["pending_id"])
+                
             if msg_lower in ("yes", "y", "yeah", "update", "do it", "sure"):
                 try:
                     res = self.memory_service.store_knowledge(
@@ -646,28 +660,18 @@ class ChatService:
             else:
                 prefix = "Okay, I've discarded the new fact and kept the old memory.\n\n"
 
-        # 1.5. Check for newly bubbled up background contradictions
+        # 3. Check for newly bubbled up background contradictions
         elif self.memory_service:
-            bg_conflict = self.memory_service.get_and_clear_pending_contradictions()
+            bg_conflict = self.memory_service.get_and_claim_pending_contradiction(session_id)
             if bg_conflict:
                 self.pending_memory_updates[session_id] = {
+                    "pending_id": bg_conflict["pending_id"],
                     "id": bg_conflict["id"],
                     "category": bg_conflict["category"],
                     "content": bg_conflict["new_content"]
                 }
                 yield f"I have that stored differently — you previously noted: '{bg_conflict['old_content']}', but you're now saying: '{bg_conflict['new_content']}'. Should I update this?"
                 return
-                
-        # 2. Handle pending irreversible actions
-        elif session_id in self.pending_actions:
-            pending_action = self.pending_actions.pop(session_id)
-            if msg_lower in ("yes", "y", "yeah", "do it", "sure", "confirm"):
-                from app.services.action_broker import ActionBroker
-                res = ActionBroker.dispatch(pending_action['tool'], pending_action['args'], confirmed=True)
-                yield f"Action completed: {res}"
-                return
-            else:
-                prefix = "Action cancelled.\n\n"
                 
         if prefix:
             yield prefix
