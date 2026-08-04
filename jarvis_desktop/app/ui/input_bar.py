@@ -87,9 +87,9 @@ class InputBar(QFrame):
         actions_box = QHBoxLayout()
         actions_box.setSpacing(8)
 
-        self.cam_btn = self._make_action_btn("📷", "Camera / Vision mode")
-        self.mic_btn = self._make_action_btn("🎤", "Voice input")
-        self.tts_btn = self._make_action_btn("🔊", "Text to Speech")
+        self.cam_btn = self._make_action_btn("📷\uFE0E", "Camera / Vision mode")
+        self.mic_btn = self._make_action_btn("🎤\uFE0E", "Voice input")
+        self.tts_btn = self._make_action_btn("🔊\uFE0E", "Text to Speech")
 
         self.send_btn = QPushButton("➤", self)
         self.send_btn.setObjectName("sendBtn")
