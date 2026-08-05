@@ -4,6 +4,8 @@ from rich import json
 import asyncio
 import os
 import httpx
+import webbrowser
+import ctypes
 from dotenv import load_dotenv
 from PySide6.QtCore import QObject, Signal
 
@@ -22,6 +24,7 @@ class BackendService(QObject):
     briefing_received = Signal(dict)            # Emits briefing payload
     action_completed = Signal(dict)             # Emits action result
     error_occurred = Signal(str)                # Emits error message
+    latency_updated = Signal(dict)              # Emits latency metrics
 
     def __init__(self, base_url: str = "http://127.0.0.1:8000", parent=None):
         super().__init__(parent)
@@ -199,7 +202,10 @@ class BackendService(QObject):
                                     safe, target = is_safe_app_target(app)
                                     if safe:
                                         try:
-                                            os.startfile(target)
+                                            if target in ("lock_screen", "system:lock_screen", "lock_pc", "lock"):
+                                                ctypes.windll.user32.LockWorkStation()
+                                            else:
+                                                os.startfile(target)
                                         except Exception as e:
                                             print(f"[BackendService] App launch error: {e}")
                                     else:
@@ -228,6 +234,26 @@ class BackendService(QObject):
                 self.briefing_received.emit(resp.json())
         except Exception as e:
             self.error_occurred.emit(f"Briefing error: {str(e)}")
+
+    async def fetch_latency(self):
+        import time
+        start_time = time.time()
+        try:
+            resp = await self.client.get("/api/latency/dashboard", timeout=2.0)
+            ping = (time.time() - start_time) * 1000
+            
+            data = {"ping": ping}
+            if resp.status_code == 200:
+                json_data = resp.json()
+                pct = json_data.get("percentiles", {})
+                if pct:
+                    data["p50"] = pct.get("p50", 0)
+                    data["p95"] = pct.get("p95", 0)
+                    data["p99"] = pct.get("p99", 0)
+            
+            self.latency_updated.emit(data)
+        except Exception:
+            self.latency_updated.emit({"ping": "--", "p50": "--", "p95": "--", "p99": "--"})
 
     async def execute_operator_action(self, action_name: str, payload: dict = None):
         """Execute operator action (e.g. open site, toggle wake word)"""

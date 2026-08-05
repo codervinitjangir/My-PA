@@ -60,6 +60,19 @@ async def main_async(app: QApplication):
 
     asyncio.create_task(health_loop())
 
+    # Live Latency Loop
+    async def latency_loop():
+        """Ping backend every 2s for live real-time latency UI updates."""
+        while win_mgr.main_win.isVisible() or win_mgr.tray.isVisible():
+            try:
+                if desktop_service.system_state.backend_status == "online":
+                    await backend_service.fetch_latency()
+            except Exception:
+                pass
+            await asyncio.sleep(2)
+
+    asyncio.create_task(latency_loop())
+
     try:
         while win_mgr.main_win.isVisible() or win_mgr.tray.isVisible():
             await asyncio.sleep(0.1)

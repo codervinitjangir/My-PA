@@ -1,5 +1,6 @@
 import os
 import logging
+import webbrowser
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from app.plugins.calendar_tool import GoogleCalendarTool
@@ -281,7 +282,9 @@ def consume_jarvis_stream(chat_service, session_id, text, imgbase64=None):
                             logger.error(f"[TELEGRAM] Failed to open URL on host PC: {e}")
             if actions.get("desktop_apps"):
                 for app_target in actions["desktop_apps"]:
-                    if app_target.lower() in ("laptop", "pc", "computer", "screen", "system"):
+                    if "lock" in app_target.lower():
+                        app_target = "lock_screen"
+                    elif app_target.lower() in ("laptop", "pc", "computer", "screen", "system"):
                         continue
                     try:
                         from config import IS_CLOUD

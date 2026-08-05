@@ -27,22 +27,23 @@ RULES:
 class VisionService:
 
     def __init__(self):
-        self._groq_clients = []
-
-        if GROQ_API_KEYS:
-            try:
-                from groq import Groq
-                for key in GROQ_API_KEYS:
-                    self._groq_clients.append(Groq(api_key=key))
-                logger.info(
-                    "[VISION] Groq vision initialized (%s) with %d key(s)",
-                    GROQ_VISION_MODEL, len(self._groq_clients)
+        self._openai_client = None
+        
+        try:
+            import os
+            key = os.getenv("AGENTROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+            if key:
+                from openai import OpenAI
+                self._openai_client = OpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=key
                 )
-            except Exception as e:
-                logger.warning("[VISION] Groq client init failed: %s", e)
+                logger.info("[VISION] OpenRouter vision initialized (nvidia/nemotron-nano-12b-v2-vl:free)")
+        except Exception as e:
+            logger.warning("[VISION] OpenAI client init failed: %s", e)
 
-        if not self._groq_clients:
-            logger.warning("[VISION] No vision provider available. Set GROQ_API_KEY.")
+        if not self._openai_client:
+            logger.warning("[VISION] No vision provider available. Set AGENTROUTER_API_KEY.")
 
     # ── Image compression ────────────────────────────────────────────────────────
 
@@ -162,39 +163,31 @@ class VisionService:
             },
         ]
 
-        # Try each API key in round-robin until one succeeds
-        for attempt, client in enumerate(self._groq_clients):
-            result = self._call_groq(client, messages, attempt)
-            if result:
-                return result
+        # Call OpenRouter API
+        result = self._call_openrouter(messages)
+        if result:
+            return result
 
         return "I couldn't analyze that image. Please try again."
 
-    def _call_groq(self, client, messages: list, attempt: int = 0) -> Optional[str]:
+    def _call_openrouter(self, messages: list) -> Optional[str]:
+        if not self._openai_client:
+            return None
         try:
-            response = client.chat.completions.create(
-                model=GROQ_VISION_MODEL,
+            response = self._openai_client.chat.completions.create(
+                model="nvidia/nemotron-nano-12b-v2-vl:free",
                 messages=messages,
                 max_tokens=600,
             )
-
             if response.choices:
                 text = (response.choices[0].message.content or "").strip()
-
                 if text:
-                    logger.info("[VISION] Groq vision success (key #%d, %d chars)", attempt + 1, len(text))
+                    logger.info("[VISION] OpenRouter vision success (%d chars)", len(text))
                     return text
-
         except Exception as e:
             err_str = str(e).lower()
-
             if "content_policy" in err_str or "safety" in err_str:
-                logger.warning("[VISION] Groq content policy (key #%d): %s", attempt + 1, e)
+                logger.warning("[VISION] OpenRouter content policy: %s", e)
                 return "The image couldn't be analyzed due to content guidelines."
-
-            if "429" in str(e) or "rate limit" in err_str:
-                logger.warning("[VISION] Key #%d rate limited, trying next...", attempt + 1)
-            else:
-                logger.warning("[VISION] Groq vision error (key #%d): %s", attempt + 1, e)
-
+            logger.warning("[VISION] OpenRouter vision error: %s", e)
         return None

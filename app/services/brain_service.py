@@ -617,7 +617,7 @@ Classify. Output EXACTLY ONE category name."""
                         seen.add(valid)
                     break
 
-        return results if results else ["open"]
+        return results
 
     def _run_llm_structured(
         self, system_prompt: str, user_content: str, key_index: int,
@@ -652,7 +652,7 @@ Classify. Output EXACTLY ONE category name."""
     def _parse_task_decisions(self, raw_response: str) -> List[Tuple[str, str]]:
 
         if not raw_response:
-            return [("open", "")]
+            return []
 
         text = raw_response.replace("\n", ",").strip()
 
@@ -706,7 +706,7 @@ Classify. Output EXACTLY ONE category name."""
                 if not matched:
                     logger.warning("[BRAIN-TASK] Could not parse decision part: '%s'", part[:80])
 
-        return decisions if decisions else [("open", "")]
+        return decisions
 
     def _rule_based_primary(self, msg: str) -> str:
         m = (msg or "").strip().lower()
