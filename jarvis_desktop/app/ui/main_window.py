@@ -15,7 +15,7 @@ from jarvis_desktop.app.ui.chat_panel import ChatPanel
 from jarvis_desktop.app.ui.command_center import CommandCenter
 from jarvis_desktop.app.ui.input_bar import InputBar
 from jarvis_desktop.app.ui.settings_dialog import SettingsDialog
-from jarvis_desktop.app.ui.orb_widget import OrbWidget
+from jarvis_desktop.app.ui.web_orb_widget import WebOrbWidget
 
 
 # ── Scan-Line Background Widget ───────────────────────────────────────────────
@@ -91,6 +91,57 @@ class MainWindow(QMainWindow):
         self.central_widget.setObjectName("rootWindow")
         self.setCentralWidget(self.central_widget)
 
+        # Apply global sleek scrollbar style
+        self.setStyleSheet("""
+            QScrollBar:vertical {
+                border: none;
+                background: rgba(255, 255, 255, 0.02);
+                width: 6px;
+                border-radius: 3px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(0, 229, 204, 0.4);
+                min-height: 20px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(0, 229, 204, 0.8);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+            
+            QScrollBar:horizontal {
+                border: none;
+                background: rgba(255, 255, 255, 0.02);
+                height: 6px;
+                border-radius: 3px;
+                margin: 0px;
+            }
+            QScrollBar::handle:horizontal {
+                background: rgba(0, 229, 204, 0.4);
+                min-width: 20px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: rgba(0, 229, 204, 0.8);
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                border: none;
+                background: none;
+                width: 0px;
+            }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                background: none;
+            }
+        """)
+
         root_layout = QVBoxLayout(self.central_widget)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
@@ -128,8 +179,8 @@ class MainWindow(QMainWindow):
         self.scan_bg = ScanLineBackground(center_canvas)
         center_stacked.addWidget(self.scan_bg)
 
-        # Layer 1: J.A.R.V.I.S HUD Dial
-        self.orb_widget = OrbWidget(center_canvas)
+        # Layer 1: J.A.R.V.I.S HUD Dial (Web 3D Orb)
+        self.orb_widget = WebOrbWidget(center_canvas)
         center_stacked.addWidget(self.orb_widget)
 
         # Layer 2: Foreground Content (Command Center + Entity counter)

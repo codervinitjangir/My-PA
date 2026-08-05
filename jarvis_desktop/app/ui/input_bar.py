@@ -194,7 +194,36 @@ class InputBar(QFrame):
         pass
 
     def set_tts_enabled(self, enabled: bool):
-        pass
+        if enabled:
+            self.tts_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(0, 229, 204, 0.06);
+                    border: 1px solid rgba(0, 229, 204, 0.18);
+                    border-radius: 18px;
+                    color: #00E5CC;
+                    font-size: 15px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 229, 204, 0.20);
+                    border-color: #00E5CC;
+                    color: #ffffff;
+                }
+            """)
+        else:
+            self.tts_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 60, 60, 0.15);
+                    border: 1.5px solid #ff3c3c;
+                    border-radius: 18px;
+                    color: #ff6b6b;
+                    font-size: 15px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 60, 60, 0.30);
+                    border-color: #ff5050;
+                    color: #ffffff;
+                }
+            """)
 
 # ── Standalone Preview ────────────────────────────────────────────────────────
 if __name__ == "__main__":

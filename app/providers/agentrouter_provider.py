@@ -243,6 +243,7 @@ class AgentRouterProvider(BaseProvider):
         chat_history: Optional[List[tuple]] = None,
         key_start_index: int = 0,
         use_search: bool = False,
+        **kwargs
     ) -> str:
         mode = REALTIME_CHAT_ADDENDUM if use_search else GENERAL_CHAT_ADDENDUM
         return self.call(question, self.deep_model, chat_history, mode_addendum=mode)
@@ -253,6 +254,7 @@ class AgentRouterProvider(BaseProvider):
         chat_history: Optional[List[tuple]] = None,
         key_start_index: int = 0,
         use_search: bool = False,
+        **kwargs
     ) -> Iterator[Any]:
         mode = REALTIME_CHAT_ADDENDUM if use_search else GENERAL_CHAT_ADDENDUM
         yield from self.stream(question, self.deep_model, chat_history, mode_addendum=mode)
@@ -264,6 +266,7 @@ class AgentRouterProvider(BaseProvider):
         formatted_results: Optional[str] = None,
         payload: Optional[dict] = None,
         key_start_index: int = 0,
+        **kwargs
     ) -> Iterator[Any]:
         extra = [formatted_results] if formatted_results else None
         yield from self.stream(

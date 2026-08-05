@@ -628,6 +628,10 @@ class ChatService:
         msg_lower = clean_user_message.lower().strip()
         prefix = ""
         
+        # Start of pre-checks timer
+        import time
+        t_precheck_start = time.perf_counter()
+
         # 1. Handle pending irreversible actions FIRST (Security)
         if session_id in self.pending_actions:
             pending_action = self.pending_actions.pop(session_id)
@@ -673,6 +677,9 @@ class ChatService:
                 yield f"I have that stored differently — you previously noted: '{bg_conflict['old_content']}', but you're now saying: '{bg_conflict['new_content']}'. Should I update this?"
                 return
                 
+        precheck_latency_ms = (time.perf_counter() - t_precheck_start) * 1000
+        logger.info("[LATENCY] Pre-checks (memory, contradiction, broker) took %.2f ms", precheck_latency_ms)
+
         if prefix:
             yield prefix
         

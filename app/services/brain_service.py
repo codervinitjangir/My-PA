@@ -862,7 +862,7 @@ Classify. Output EXACTLY ONE category name."""
             urls = self._extract_urls(message)
 
             if len(urls) <= 1:
-                return {"message": message, "raw": message, "url": urls[0] if urls else "https://www.google.com"}
+                return {"message": message, "raw": message, "url": urls[0] if urls else ""}
             
             return [{"message": message, "raw": message, "url": u} for u in urls]
         
@@ -938,12 +938,14 @@ Classify. Output EXACTLY ONE category name."""
                         elif p and "." in p:
                             _add(p)
 
-                        elif p:
-                            _add("https://www." + p + ".com")
+                        elif p and "." not in p and " " not in p:
+                            # Only guess .com if it's a single alphanumeric word, otherwise ignore
+                            if p.isalnum():
+                                _add("https://www." + p + ".com")
 
                 break
 
-        return urls if urls else ["https://www.google.com"]
+        return urls
 
     def _extract_play_query(self, msg: str) -> str:
 

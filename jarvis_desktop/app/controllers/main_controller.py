@@ -145,41 +145,54 @@ class MainController(QObject):
             threading.Thread(target=self._record_and_transcribe, daemon=True).start()
 
     def _record_and_transcribe(self):
-        """Record audio from microphone for 3 seconds and emit recorded signal"""
+        """Record audio continuously using simple VAD energy threshold"""
         try:
             import sounddevice as sd
             import wave
             import numpy as np
+            import time
 
             RATE = 16000
             CHANNELS = 1
-            DURATION = 3  # seconds
+            DURATION = 2.5  # slightly shorter chunks for faster response
 
-            recording = sd.rec(int(DURATION * RATE), samplerate=RATE, channels=CHANNELS, dtype=np.int16)
-            sd.wait()
+            while self.is_listening:
+                recording = sd.rec(int(DURATION * RATE), samplerate=RATE, channels=CHANNELS, dtype=np.int16)
+                sd.wait()
 
-            wav_io = io.BytesIO()
-            with wave.open(wav_io, 'wb') as wf:
-                wf.setnchannels(CHANNELS)
-                wf.setsampwidth(2)
-                wf.setframerate(RATE)
-                wf.writeframes(recording.tobytes())
+                if not self.is_listening:
+                    break
 
-            wav_bytes = wav_io.getvalue()
-            wav_io.close()
+                # Calculate RMS energy of the chunk
+                energy = np.sqrt(np.mean(recording.astype(np.float64)**2))
+                
+                # Only send if someone is actually talking (threshold ~150-300)
+                if energy > 200:
+                    wav_io = io.BytesIO()
+                    with wave.open(wav_io, 'wb') as wf:
+                        wf.setnchannels(CHANNELS)
+                        wf.setsampwidth(2)
+                        wf.setframerate(RATE)
+                        wf.writeframes(recording.tobytes())
 
-            self.audio_recorded.emit(wav_bytes)
+                    wav_bytes = wav_io.getvalue()
+                    wav_io.close()
+
+                    self.audio_recorded.emit(wav_bytes)
+                    
+                    # Pause briefly to prevent overlapping queries while LLM is generating
+                    time.sleep(1)
+
         except Exception as e:
             print(f"[Mic Recording Error]: {e}")
             self.audio_recorded.emit(b"")
 
     def _on_audio_recorded(self, wav_bytes: bytes):
-        self.is_listening = False
-        self.win.input_bar.set_mic_active(False)
         if wav_bytes:
             asyncio.create_task(self._process_stt(wav_bytes))
         else:
-            self.sys_state.set_voice_state("idle")
+            if not self.is_listening:
+                self.sys_state.set_voice_state("idle")
 
     async def _process_stt(self, wav_bytes: bytes):
         text = await self.backend.transcribe_audio(wav_bytes)

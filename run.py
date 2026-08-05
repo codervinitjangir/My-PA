@@ -45,6 +45,15 @@ if __name__ == "__main__":
         # Render provides the port in the $PORT environment variable. Default to 8000 for local.
         port = int(os.environ.get("PORT", 8000))
         
+        # Start LiveKit Agent worker in the background
+        livekit_process = None
+        if os.getenv("LIVEKIT_API_KEY"):
+            print("[INFO] Starting LiveKit Voice Agent...")
+            livekit_process = subprocess.Popen(
+                [sys.executable, "-m", "app.core.voice.livekit_agent", "dev"],
+                cwd=str(Path(__file__).parent)
+            )
+
         uvicorn.run(
             "app.main:app",
             host="0.0.0.0",
@@ -62,6 +71,8 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("\n[INFO] Server stopped by user.")
+        if 'livekit_process' in locals() and livekit_process:
+            livekit_process.terminate()
         
     except Exception as e:
         print(f"[ERROR] Unexpected error: {e}")

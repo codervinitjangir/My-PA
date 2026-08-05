@@ -2,6 +2,10 @@
 
 import sys
 import os
+
+# Disable Chromium Sandbox because pythonw.exe doesn't provide a console handle, which breaks sandbox creation
+os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
+
 import asyncio
 import qasync
 from PySide6.QtWidgets import QApplication
@@ -84,14 +88,8 @@ async def main_async(app: QApplication):
 def main():
     init_high_dpi()
 
-    # Launch local backend server automatically
+    # Launch local backend server automatically (disabled here, bat file handles it)
     backend_process = None
-    try:
-        import subprocess
-        backend_process = subprocess.Popen([sys.executable, "run.py"])
-        print("[JARVIS] Auto-started local backend server.")
-    except Exception as e:
-        print(f"[JARVIS] Failed to auto-start backend: {e}")
 
     app = QApplication(sys.argv)
     app.setApplicationName("JARVIS Desktop")

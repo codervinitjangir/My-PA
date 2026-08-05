@@ -391,7 +391,7 @@ _state_mgr = GlobalStateManager()
 # ── Security: CORS locked to localhost only ───────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization", "X-JARVIS-Token"],
@@ -399,7 +399,7 @@ app.add_middleware(
 
 # ── Security: Bearer token auth (only active when JARVIS_API_TOKEN is set) ────
 _JARVIS_TOKEN = os.getenv("JARVIS_API_TOKEN", "").strip()
-_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config", "/telegram/webhook", "/laptop/ws", "/voice/ws"}
+_AUTH_PUBLIC_PATHS = {"/", "/health", "/api/config", "/telegram/webhook", "/laptop/ws", "/voice/ws", "/api/livekit/token"}
 
 @app.websocket("/voice/ws")
 async def voice_websocket_endpoint(websocket: WebSocket, token: str = None):
@@ -636,6 +636,34 @@ async def api_info():
         }
     }
 
+
+@app.get("/api/livekit/token")
+async def get_livekit_token(participant_name: str = "Boss"):
+    """
+    Generate an access token for the LiveKit WebRTC frontend client.
+    Requires LIVEKIT_API_KEY and LIVEKIT_API_SECRET in .env.
+    """
+    from livekit import api
+    import os
+    
+    api_key = os.getenv("LIVEKIT_API_KEY")
+    api_secret = os.getenv("LIVEKIT_API_SECRET")
+    
+    if not api_key or not api_secret:
+        raise HTTPException(status_code=500, detail="LiveKit keys missing in .env")
+        
+    token = api.AccessToken(api_key, api_secret) \
+        .with_identity(participant_name) \
+        .with_name(participant_name) \
+        .with_grants(api.VideoGrants(
+            room_join=True,
+            room="jarvis-room",
+        ))
+    
+    return {
+        "token": token.to_jwt(),
+        "url": os.getenv("LIVEKIT_URL")
+    }
 
 @app.get("/system/health")
 async def get_system_health():
@@ -1240,6 +1268,15 @@ async def text_to_speech(request: TTSRequest):
         media_type="audio/mpeg",
         headers={"Cache-Control": "no-cache"},
     )
+
+class OpenAITTSRequest(BaseModel):
+    model: str
+    input: str
+    voice: str
+
+@app.post("/v1/audio/speech")
+async def openai_tts_mock(request: OpenAITTSRequest):
+    return await text_to_speech(TTSRequest(text=request.input))
 
 @app.post("/stt")
 async def speech_to_text(
