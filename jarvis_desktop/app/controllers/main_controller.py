@@ -201,7 +201,7 @@ class MainController(QObject):
             threading.Thread(target=self._record_and_transcribe, daemon=True).start()
 
     def _record_and_transcribe(self):
-        """Record audio continuously using simple VAD energy threshold"""
+        """Record audio dynamically using VAD to minimize latency"""
         try:
             import sounddevice as sd
             import wave
@@ -210,34 +210,54 @@ class MainController(QObject):
 
             RATE = 16000
             CHANNELS = 1
-            DURATION = 2.5  # slightly shorter chunks for faster response
+            CHUNK_DURATION = 0.1
+            CHUNK_SAMPLES = int(CHUNK_DURATION * RATE)
+            SILENCE_LIMIT = 0.8  # seconds of silence to mark end of sentence
+            ENERGY_THRESHOLD = 200
 
             while self.is_listening:
-                recording = sd.rec(int(DURATION * RATE), samplerate=RATE, channels=CHANNELS, dtype=np.int16)
-                sd.wait()
+                audio_buffer = []
+                silence_timer = 0.0
+                has_spoken = False
 
-                if not self.is_listening:
-                    break
+                while self.is_listening:
+                    recording = sd.rec(CHUNK_SAMPLES, samplerate=RATE, channels=CHANNELS, dtype=np.int16)
+                    sd.wait()
 
-                # Calculate RMS energy of the chunk
-                energy = np.sqrt(np.mean(recording.astype(np.float64)**2))
-                
-                # Only send if someone is actually talking (threshold ~150-300)
-                if energy > 200:
+                    if not self.is_listening:
+                        break
+
+                    energy = np.sqrt(np.mean(recording.astype(np.float64)**2))
+
+                    if energy > ENERGY_THRESHOLD:
+                        has_spoken = True
+                        silence_timer = 0.0
+                        audio_buffer.append(recording)
+                    elif has_spoken:
+                        silence_timer += CHUNK_DURATION
+                        audio_buffer.append(recording)
+                        if silence_timer >= SILENCE_LIMIT:
+                            break  # End of sentence
+                    else:
+                        pass  # Waiting for speech to start
+
+                if has_spoken and len(audio_buffer) > 0:
+                    full_recording = np.concatenate(audio_buffer, axis=0)
+
                     wav_io = io.BytesIO()
                     with wave.open(wav_io, 'wb') as wf:
                         wf.setnchannels(CHANNELS)
                         wf.setsampwidth(2)
                         wf.setframerate(RATE)
-                        wf.writeframes(recording.tobytes())
+                        wf.writeframes(full_recording.tobytes())
 
                     wav_bytes = wav_io.getvalue()
                     wav_io.close()
 
                     self.audio_recorded.emit(wav_bytes)
-                    
-                    # Pause briefly to prevent overlapping queries while LLM is generating
-                    time.sleep(1)
+
+                    # Brief pause so we don't immediately start recording our own TTS
+                    time.sleep(0.5)
 
         except Exception as e:
             print(f"[Mic Recording Error]: {e}")
