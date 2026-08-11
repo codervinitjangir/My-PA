@@ -213,7 +213,7 @@ class MainController(QObject):
             CHUNK_DURATION = 0.1
             CHUNK_SAMPLES = int(CHUNK_DURATION * RATE)
             SILENCE_LIMIT = 0.8  # seconds of silence to mark end of sentence
-            ENERGY_THRESHOLD = 200
+            ENERGY_THRESHOLD = 50  # Lowered from 200 to catch quieter mics
 
             while self.is_listening:
                 audio_buffer = []
@@ -221,6 +221,14 @@ class MainController(QObject):
                 has_spoken = False
 
                 while self.is_listening:
+                    # Do not record while Jarvis is thinking or speaking (prevents echoing itself in continuous mode)
+                    if self.sys_state.voice_state not in ("listening", "idle"):
+                        has_spoken = False
+                        silence_timer = 0.0
+                        audio_buffer.clear()
+                        time.sleep(0.1)
+                        continue
+
                     recording = sd.rec(CHUNK_SAMPLES, samplerate=RATE, channels=CHANNELS, dtype=np.int16)
                     sd.wait()
 
