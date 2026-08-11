@@ -1,56 +1,214 @@
 # jarvis_desktop/app/ui/web_orb_widget.py
 
 import json
-from PySide6.QtWidgets import QWidget, QVBoxLayout
+import math
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QStackedWidget, QLabel, QPushButton, QFrame
+)
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtCore import QUrl, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import QUrl, Qt, Signal, QTimer, QPropertyAnimation, QEasingCurve, Property
+from PySide6.QtGui import QColor, QPainter, QPen, QRadialGradient, QBrush, QFont, QLinearGradient
 from PySide6.QtWebEngineCore import QWebEngineSettings
+
+
+class _OrbPlaceholder(QWidget):
+    """
+    Premium dark placeholder shown when the Ultron Orb server is not running.
+    Features a pulsing animated ring and a clean 'Launch Orb' call-to-action.
+    """
+    launch_requested = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setStyleSheet("background-color: #05050f;")
+
+        # Pulse animation state
+        self._pulse = 0.0
+        self._pulse_dir = 1
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start(40)  # ~25 fps — lightweight
+
+        # Centre layout
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignCenter)
+        layout.setSpacing(28)
+
+        # Icon / ring area — purely painted in paintEvent
+        self._ring_widget = QWidget(self)
+        self._ring_widget.setFixedSize(160, 160)
+        self._ring_widget.setAttribute(Qt.WA_TranslucentBackground)
+        # Forward paint event so the ring appears inside the layout
+        self._ring_widget.paintEvent = self._paint_ring
+        layout.addWidget(self._ring_widget, alignment=Qt.AlignHCenter)
+
+        # Title
+        title = QLabel("Ultron Orb", self)
+        title.setStyleSheet(
+            "font-size: 22px; font-weight: 700; color: rgba(124,106,239,0.80);"
+            "letter-spacing: 2px; background: transparent;"
+        )
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        # Sub-label
+        sub = QLabel("3D Holographic Interface — Not Running", self)
+        sub.setStyleSheet(
+            "font-size: 12px; color: rgba(255,255,255,0.28); background: transparent;"
+        )
+        sub.setAlignment(Qt.AlignCenter)
+        layout.addWidget(sub)
+
+        # Launch button
+        self.launch_btn = QPushButton("  ◉  Launch Orb", self)
+        self.launch_btn.setFixedSize(180, 46)
+        self.launch_btn.setCursor(Qt.PointingHandCursor)
+        self.launch_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+                    stop:0 rgba(124,106,239,0.25), stop:1 rgba(0,217,255,0.15));
+                border: 1px solid rgba(124,106,239,0.65);
+                border-radius: 14px;
+                color: #c9b8ff;
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 1px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+                    stop:0 rgba(124,106,239,0.45), stop:1 rgba(0,217,255,0.30));
+                border-color: rgba(124,106,239,0.95);
+                color: #ffffff;
+            }
+            QPushButton:pressed {
+                background: rgba(124,106,239,0.55);
+            }
+        """)
+        self.launch_btn.clicked.connect(self.launch_requested.emit)
+        layout.addWidget(self.launch_btn, alignment=Qt.AlignHCenter)
+
+        # Hint
+        hint = QLabel("Saves ~300 MB RAM when off", self)
+        hint.setStyleSheet(
+            "font-size: 10px; color: rgba(255,255,255,0.18); background: transparent;"
+        )
+        hint.setAlignment(Qt.AlignCenter)
+        layout.addWidget(hint)
+
+    def _tick(self):
+        self._pulse += 0.04 * self._pulse_dir
+        if self._pulse >= 1.0:
+            self._pulse_dir = -1
+        elif self._pulse <= 0.0:
+            self._pulse_dir = 1
+        self._ring_widget.update()
+
+    def _paint_ring(self, event):
+        p = QPainter(self._ring_widget)
+        p.setRenderHint(QPainter.Antialiasing)
+        cx, cy = 80, 80
+        R = 60
+
+        # Glow
+        g = QRadialGradient(cx, cy, R)
+        g.setColorAt(0.0, QColor(124, 106, 239, int(30 + self._pulse * 25)))
+        g.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(g))
+        p.drawEllipse(cx - R, cy - R, R * 2, R * 2)
+
+        # Outer dashed ring
+        pen = QPen(QColor(124, 106, 239, int(60 + self._pulse * 80)), 1.5, Qt.DashLine)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        p.drawEllipse(cx - R, cy - R, R * 2, R * 2)
+
+        # Inner ring
+        pen2 = QPen(QColor(0, 217, 255, int(40 + self._pulse * 60)), 1.0)
+        p.setPen(pen2)
+        p.drawEllipse(cx - R + 14, cy - R + 14, (R - 14) * 2, (R - 14) * 2)
+
+        # Centre dot
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(124, 106, 239, int(120 + self._pulse * 100)))
+        p.drawEllipse(cx - 6, cy - 6, 12, 12)
+
+        p.end()
+
 
 class WebOrbWidget(QWidget):
     """
-    Wrapper for QWebEngineView that loads the Next.js Ultron Orb UI
-    and exposes the exact same API as the original OrbWidget.
+    Wrapper for the Ultron Orb panel.
+
+    - When orb is NOT running: shows a premium dark placeholder with a 'Launch Orb' button.
+    - When orb IS running: shows the live QWebEngineView at localhost:3000.
+    Exposes the same API (set_voice_state) as before.
     """
+
+    # Forwarded signal so the controller can connect a single slot
+    launch_requested = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        # We don't want it to be transparent for mouse events, because the user wants to interact with it!
-        # self.setAttribute(Qt.WA_TransparentForMouseEvents) 
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.web_view = QWebEngineView(self)
-        
-        # Transparent background for the webview itself, so the scanlines show through
-        self.web_view.page().setBackgroundColor(QColor(Qt.transparent))
-        
-        # Enable WebGL
-        self.web_view.settings().setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
-        # Enable media (webcam)
-        self.web_view.settings().setAttribute(QWebEngineSettings.WebAttribute.AllowRunningInsecureContent, True)
-        
-        # Handle media capture requests (Webcam)
-        self.web_view.page().featurePermissionRequested.connect(self.on_feature_permission_requested)
-        
-        # Load the dev server url for now
-        self.web_view.setUrl(QUrl("http://localhost:3000"))
-        
-        layout.addWidget(self.web_view)
-        
+
+        self._stack = QStackedWidget(self)
+        layout.addWidget(self._stack)
+
+        # Page 0 — Placeholder
+        self._placeholder = _OrbPlaceholder(self)
+        self._placeholder.launch_requested.connect(self.launch_requested.emit)
+        self._stack.addWidget(self._placeholder)
+
+        # Page 1 — Live Web View (created lazily on first launch)
+        self._web_view: QWebEngineView | None = None
+
         self._voice_state = "online"
-        
-    def on_feature_permission_requested(self, url, feature):
-        # Auto-grant webcam access
+        # Start on placeholder
+        self._stack.setCurrentIndex(0)
+
+    # ── Public API ──────────────────────────────────────────────────────────
+
+    def show_orb(self):
+        """Switch to the live web view, creating it if needed."""
+        if self._web_view is None:
+            self._web_view = QWebEngineView(self)
+            self._web_view.page().setBackgroundColor(QColor(Qt.transparent))
+            self._web_view.settings().setAttribute(
+                QWebEngineSettings.WebAttribute.WebGLEnabled, True
+            )
+            self._web_view.settings().setAttribute(
+                QWebEngineSettings.WebAttribute.AllowRunningInsecureContent, True
+            )
+            self._web_view.page().featurePermissionRequested.connect(
+                self._on_feature_permission
+            )
+            self._stack.addWidget(self._web_view)
+
+        self._web_view.setUrl(QUrl("http://localhost:3000"))
+        self._stack.setCurrentWidget(self._web_view)
+
+    def hide_orb(self):
+        """Switch back to the placeholder."""
+        self._stack.setCurrentWidget(self._placeholder)
+        # Blank the web view to stop it consuming CPU/GPU
+        if self._web_view is not None:
+            self._web_view.setUrl(QUrl("about:blank"))
+
+    def set_voice_state(self, state: str):
+        self._voice_state = state.lower()
+        if self._web_view is not None and self._stack.currentWidget() is self._web_view:
+            payload = json.dumps({"type": "voice_state", "state": self._voice_state})
+            self._web_view.page().runJavaScript(f"window.postMessage({payload}, '*');")
+
+    # ── Private ─────────────────────────────────────────────────────────────
+
+    def _on_feature_permission(self, url, feature):
         from PySide6.QtWebEngineCore import QWebEnginePage
         if feature == QWebEnginePage.Feature.MediaVideoCapture:
-            self.web_view.page().setFeaturePermission(url, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
-            
-    def set_voice_state(self, state: str):
-        """
-        Sends the voice state update down into the Next.js UI via postMessage
-        """
-        self._voice_state = state.lower()
-        payload = json.dumps({"type": "voice_state", "state": self._voice_state})
-        js_code = f"window.postMessage({payload}, '*');"
-        self.web_view.page().runJavaScript(js_code)
+            self._web_view.page().setFeaturePermission(
+                url, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
+            )

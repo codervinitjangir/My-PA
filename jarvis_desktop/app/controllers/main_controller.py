@@ -94,6 +94,9 @@ class MainController(QObject):
         self.win.input_bar.mic_toggled.connect(self._on_mic_toggled)
         self.win.input_bar.tts_toggled.connect(self._on_tts_toggled)
 
+        # Also allow launching orb from the placeholder panel button
+        self.win.orb_widget.launch_requested.connect(self._on_orb_toggled)
+
         self.win.chat_panel.chip_clicked.connect(self._on_send_message)
         self.win.chat_panel.settings_requested.connect(self.win.show_settings)
 
@@ -326,12 +329,14 @@ class MainController(QObject):
         """Start or stop the Ultron Orb Next.js dev server on demand."""
         if self.orb.is_running:
             self.orb.stop()
+            self.win.orb_widget.hide_orb()
             self.win.header.set_orb_state(False)
             self.win.chat_panel.add_assistant_message(
                 "🌀 Ultron Orb stopped. RAM freed."
             )
         else:
             self.orb.start()
+            self.win.orb_widget.show_orb()
             self.win.header.set_orb_state(True)
             self.win.chat_panel.add_assistant_message(
                 "🌀 Ultron Orb starting... open http://localhost:3000 in a moment."
