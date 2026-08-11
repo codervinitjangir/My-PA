@@ -330,8 +330,8 @@ class BrainService:
             "content": ["write", "draft", "compose", "code", "essay", "letter", "poem"],
             "google_search": ["search", "google", "look up", "find", "who", "what", "how", "where"],
             "youtube_search": ["youtube", "video"],
-            "check_calendar": ["calendar", "schedule", "event", "meeting", "today", "tomorrow", "future"],
-            "check_emails": ["check", "read", "inbox", "any mail", "new email"]
+            "check_calendar": ["calendar", "schedule", "event", "meeting", "appointment", "agenda"],
+            "check_emails": ["email", "inbox", "mail", "gmail"]
         }
         
         for task_type, query in decisions:
