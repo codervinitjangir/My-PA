@@ -46,10 +46,10 @@ logger = logging.getLogger(__name__)
 
 WARMUP_SECONDS: Final = 0.5
 
-# Whisper has never seen Bruno's name and reliably hears "Eevee". A short prompt
-# biases the decoder toward expected vocabulary. Keep it minimal: long prompts
-# leak into transcripts and encourage the model to invent matching text.
-NAME_PROMPT: Final = "Bruno"
+# Vocabulary hint biases the decoder toward expected words.
+# Including Jarvis (the assistant name) and common Hinglish words
+# helps Whisper decode Indian-accented English and Hindi/Hinglish correctly.
+NAME_PROMPT: Final = "Jarvis. Haan, theek hai, bhai, yaar, kya, karo, batao, matlab, acha."
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +65,9 @@ class ModelProfile:
 
 
 GPU_PROFILE: Final = ModelProfile("distil-large-v3", "cuda", "float16")
-CPU_PROFILE: Final = ModelProfile("base.en", "cpu", "int8")
+# base (not base.en) is the multilingual variant — required for Hindi/Hinglish.
+# It understands English, Hindi, and code-switched (Hinglish) speech.
+CPU_PROFILE: Final = ModelProfile("base", "cpu", "int8")
 
 
 def default_cpu_threads() -> int:
@@ -147,7 +149,7 @@ class WhisperTranscriber:
         device_preference: str = "auto",
         model_dir: Path | None = None,
         beam_size: int = 5,
-        language: str | None = "en",
+        language: str | None = None,   # None = auto-detect (supports Hindi/Hinglish/English)
         vad_filter: bool = True,
         initial_prompt: str | None = NAME_PROMPT,
         cpu_threads: int = 0,

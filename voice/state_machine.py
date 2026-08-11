@@ -9,6 +9,7 @@ from voice.pipeline import Pipeline
 from adapters.factory import load_providers
 from adapters.conversation import Conversation
 from adapters.chain import ProviderChain
+from adapters.prompt import build_system_prompt
 from voice.tts.piper import PiperVoice
 from voice.stt.whisper import WhisperEngine
 from voice.audio.recorder import AudioRecorder
@@ -48,7 +49,10 @@ class VoiceStateMachine:
             transcriber = WhisperEngine()
             recorder = AudioRecorder(always_on=True)
             conversation = Conversation(
-                system_prompt="You are Jarvis, a helpful and concise AI assistant."
+                system_prompt=build_system_prompt(
+                    can_see_screen=True,
+                    can_use_browser=True,
+                )
             )
 
             # Create the zero-latency pipeline
