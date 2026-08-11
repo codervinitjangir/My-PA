@@ -1048,7 +1048,7 @@ class ChatService:
                     import traceback
                     tb = traceback.format_exc()
                     logger.error("[JARVIS-STREAM] Task Extraction Error:\n%s", tb)
-                    error_msg = f"\n\n[System: I encountered an error extracting task payloads:\n{type(e).__name__}: {str(e)}\n\nTraceback:\n{tb}]"
+                    error_msg = "\n\n[System: Sorry, I hit an internal error trying to do that — I've logged the details.]"
                     self.sessions[session_id][-1].content += error_msg
                     yield error_msg
                     return
