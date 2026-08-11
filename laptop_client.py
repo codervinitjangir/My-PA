@@ -170,8 +170,8 @@ def _clipboard_monitor_loop() -> None:
     last_content: str = ""
     try:
         last_content = pyperclip.paste() or ""
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("[CLIPBOARD] Initial paste failed: %s", e)
 
     while True:
         try:
@@ -227,7 +227,7 @@ async def handle_command(command: dict) -> dict:
                 return {"status": "error", "message": str(e)}
         return {"status": "error", "message": "No URL provided"}
         
-    elif action == "screenshot":
+    elif action in ("screenshot", "capture_screen"):
         try:
             from PIL import ImageGrab
             img = ImageGrab.grab()
@@ -240,6 +240,14 @@ async def handle_command(command: dict) -> dict:
             return {"status": "success", "image_b64": b64}
         except ImportError:
             return {"status": "error", "message": "Pillow is not installed. Run pip install Pillow"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    elif action == "lock_screen":
+        try:
+            import ctypes
+            ctypes.windll.user32.LockWorkStation()
+            return {"status": "success", "message": "Screen locked"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
             

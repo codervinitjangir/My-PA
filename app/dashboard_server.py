@@ -155,8 +155,8 @@ async def _send_qr_via_telegram(url: str) -> None:
                 photo=buf,
                 caption="Scan to open dashboard on your phone",
             )
-        except Exception:
-            pass  # QR image is best-effort — URL already sent
+        except Exception as e:
+            logger.debug("[DASHBOARD] Could not send QR image: %s", e)
 
         logger.info("[DASHBOARD] QR sent to Telegram owner.")
     except Exception as e:
@@ -170,8 +170,8 @@ def _get_briefing_text() -> str:
     try:
         if _scheduler_ref and hasattr(_scheduler_ref, "LAST_BRIEFING"):
             return _scheduler_ref.LAST_BRIEFING or "No briefing generated yet."
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("[DASHBOARD] Error getting briefing: %s", e)
     return "Briefing unavailable."
 
 
@@ -589,8 +589,8 @@ class _DashboardHandler:
             try:
                 writer.close()
                 await writer.wait_closed()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("[DASHBOARD] Error closing writer: %s", e)
 
     def _respond(
         self,

@@ -637,8 +637,10 @@ class ChatService:
             pending_action = self.pending_actions.pop(session_id)
             if msg_lower in ("yes", "y", "yeah", "do it", "sure", "confirm"):
                 from app.services.action_broker import ActionBroker
-                res = ActionBroker.dispatch(pending_action['tool'], pending_action['args'], confirmed=True)
-                yield f"Action completed: {res}"
+                _, msg, _ = ActionBroker.dispatch(
+                    pending_action['tool'], pending_action['args'], confirmed=True
+                )
+                yield f"Action completed: {msg}"
                 return
             else:
                 prefix = "Action cancelled.\n\n"
@@ -666,7 +668,9 @@ class ChatService:
 
         # 3. Check for newly bubbled up background contradictions
         elif self.memory_service:
+            t_mem_start = time.perf_counter()
             bg_conflict = self.memory_service.get_and_claim_pending_contradiction(session_id)
+            logger.info("[LATENCY] Memory contradiction check took %.2f ms", (time.perf_counter() - t_mem_start) * 1000)
             if bg_conflict:
                 self.pending_memory_updates[session_id] = {
                     "pending_id": bg_conflict["pending_id"],
@@ -883,6 +887,13 @@ class ChatService:
                 query_type, tasks, reasoning, brain_elapsed_ms, intent_dict = (
                     "realtime", [], "Brain timeout, defaulting to realtime", 0, {}
                 )
+            except Exception as e:
+                import traceback
+                tb = traceback.format_exc()
+                logger.error("[JARVIS] Brain error:\n%s", tb)
+                query_type, tasks, reasoning, brain_elapsed_ms, intent_dict = (
+                    "realtime", [], f"Brain crashed: {e}", 0, {}
+                )
 
             if query_type in ("general", "casual_chat"):
                 formatted_results, search_payload = "", None
@@ -899,6 +910,11 @@ class ChatService:
                         "[JARVIS] Web search prefetch timed out after %ds", 
                         JARVIS_BRAIN_SEARCH_TIMEOUT
                     )
+                    formatted_results, search_payload = "", None
+                except Exception as e:
+                    import traceback
+                    tb = traceback.format_exc()
+                    logger.error("[JARVIS] Search error:\n%s", tb)
                     formatted_results, search_payload = "", None
         finally:
             executor.shutdown(wait=False)
@@ -1026,7 +1042,16 @@ class ChatService:
             if self.task_manager and self.brain_service:
                 # Extract actual intent and payload for each task
                 # Use clean_user_message (without cam bypass token)
-                intents = self.brain_service.extract_task_payloads(clean_user_message, tasks, chat_history)
+                try:
+                    intents = self.brain_service.extract_task_payloads(clean_user_message, tasks, chat_history)
+                except Exception as e:
+                    import traceback
+                    tb = traceback.format_exc()
+                    logger.error("[JARVIS-STREAM] Task Extraction Error:\n%s", tb)
+                    error_msg = f"\n\n[System: I encountered an error extracting task payloads:\n{type(e).__name__}: {str(e)}\n\nTraceback:\n{tb}]"
+                    self.sessions[session_id][-1].content += error_msg
+                    yield error_msg
+                    return
                 
                 yield {
                     "_activity": {

@@ -323,22 +323,35 @@ class BrainService:
         validated_decisions = []
         msg_lower = msg.lower()
         
+        TASK_KEYWORDS = {
+            "open": ["open", "launch", "go", "start", "website", "site"],
+            "play": ["play", "listen", "song", "music"],
+            "generate_image": ["generate", "draw", "create", "picture", "image", "make", "paint"],
+            "content": ["write", "draft", "compose", "code", "essay", "letter", "poem"],
+            "google_search": ["search", "google", "look up", "find", "who", "what", "how", "where"],
+            "youtube_search": ["youtube", "video"],
+            "check_calendar": ["calendar", "schedule", "event", "meeting", "today", "tomorrow", "future"],
+            "check_emails": ["check", "read", "inbox", "any mail", "new email"]
+        }
+        
         for task_type, query in decisions:
-            if not query:
-                validated_decisions.append((task_type, query))
-                continue
+            if task_type not in ("open_webcam", "close_webcam"):
+                if not query:
+                    logger.warning("[BRAIN] Hallucination detected! Empty query for task type '%s'", task_type)
+                    continue
+                    
+                # Check verb overlap
+                verbs = TASK_KEYWORDS.get(task_type, [])
+                if verbs and not any(v in msg_lower for v in verbs):
+                    logger.warning("[BRAIN] Hallucination detected! Task type '%s' does not match any user verbs in '%s'.", task_type, msg[:50])
+                    continue
+                    
+                # Filter to meaningful words (len > 2)
+                query_words = [w.lower() for w in query.split() if len(w) > 2]
                 
-            # Filter to meaningful words (len > 2)
-            query_words = [w.lower() for w in query.split() if len(w) > 2]
-            
-            if not query_words:
-                validated_decisions.append((task_type, query))
-                continue
-                
-            # Check if at least one meaningful word is in the original message
-            if not any(w in msg_lower for w in query_words):
-                logger.warning("[BRAIN] Hallucination detected! Extracted query '%s' shares no keywords with original message '%s'.", query, msg[:50])
-                continue
+                if query_words and not any(w in msg_lower for w in query_words):
+                    logger.warning("[BRAIN] Hallucination detected! Extracted query '%s' shares no keywords with original message '%s'.", query, msg[:50])
+                    continue
                 
             validated_decisions.append((task_type, query))
 

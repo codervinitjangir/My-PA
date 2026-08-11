@@ -55,14 +55,14 @@ class FastPathIntentEngine(IntentEngine):
                 confidence=0.95
             )
 
-        if any(w in text_lower for w in ["unmute volume", "unmute sound", "unmute pc", "unmute laptop", "unmute audio"]):
+        if re.search(r'(unmute)\s+(?:the\s+)?(volume|sound|pc|laptop|audio)', text_lower):
             return IntentPrediction(
                 intent_type="action",
                 action="volume_unmute",
                 confidence=0.95
             )
 
-        if any(w in text_lower for w in ["mute volume", "mute sound", "mute pc", "mute laptop", "mute audio"]):
+        if re.search(r'(mute)\s+(?:the\s+)?(volume|sound|pc|laptop|audio)', text_lower):
             return IntentPrediction(
                 intent_type="action",
                 action="volume_mute",

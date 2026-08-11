@@ -1,1 +1,1 @@
-# Adapters package
+"""Language model providers and conversation state."""

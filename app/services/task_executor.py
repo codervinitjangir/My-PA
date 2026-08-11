@@ -123,7 +123,11 @@ class TaskExecutor:
                             elif result.startswith("system:"):
                                 sys_action = result[7:]
                                 response.desktop_apps.append(sys_action)
-                                response.text = f"Locked your PC screen."
+                                if "lock" in sys_action:
+                                    response.text = "Locked your PC screen."
+                                elif "scroll" in sys_action:
+                                    direction = "up" if "up" in sys_action else "down"
+                                    response.text = f"Scrolled {direction}."
                             else:
                                 response.wopens.append(result)
                             
@@ -180,7 +184,7 @@ class TaskExecutor:
                 response.contents, response.googlesearches, response.youtubesearches,
                 response.desktop_apps, response.calendar_results, response.email_results
             )
-            response.text = parts if parts else "All done."
+            response.text = parts if parts else "I couldn't complete that action. Could you clarify?"
             
         return response
 
@@ -263,7 +267,7 @@ class TaskExecutor:
         if googlesearches or youtubesearches:
             parts.append("I've run the search for you.")
             
-        return " ".join(parts) if parts else "Done."
+        return " ".join(parts) if parts else ""
 
     def _validate_url(self, url: str) -> Optional[str]:
         if not url or len(url) > 2048:

@@ -61,4 +61,27 @@ dateparser>=1.2.0
 qrcode>=7.4.0
 
 # ── Relay Proxy WAF Bypass ────────────────────────────────────────────────────
-curl_cffi>=0.5.9
+curl_cffi>=0.5.9# Bruno dependencies.
+# Grows one step at a time so every addition is deliberate and reviewable.
+# Install with:  pip install -r requirements.txt
+#
+# This is the CPU build, and it is what most users run. Owners of an NVIDIA
+# GPU can additionally install requirements-gpu.txt for faster, more accurate
+# speech recognition; Bruno detects it at startup and needs no configuration.
+
+python-dotenv==1.0.1
+
+# Audio capture and playback
+sounddevice==0.5.5
+numpy==2.5.1
+
+# Speech-to-text
+faster-whisper==1.2.1
+
+# Language model access. Used for every OpenAI-compatible provider, not just
+# OpenAI itself.
+openai==2.52.0
+
+# System tray
+pystray==0.19.5
+pillow==12.3.0

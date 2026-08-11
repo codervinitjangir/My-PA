@@ -417,8 +417,8 @@ def beep():
     try:
         import winsound
         winsound.MessageBeep(winsound.MB_ICONASTERISK)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("[BEEP] Failed to beep: %s", e)
 
 def wake_word_thread():
     global WAKE_WORD_PAUSED, QUIT_FLAG
@@ -740,8 +740,8 @@ def play_tts(text, metrics=None):
         try:
             while not audio_queue.empty():
                 audio_queue.get_nowait()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("[AUDIO-PIPELINE] Error clearing audio queue: %s", e)
         WAKE_WORD_PAUSED = False
         logger.info("[AUDIO-PIPELINE] Wake detection resumed.")
 
