@@ -337,6 +337,25 @@ class TaskExecutor:
         query = (payload.get("query", payload.get("message", "")) or "").strip()[:500]
         if not query:
             return "https://www.youtube.com"
+        try:
+            import yt_dlp
+            ydl_opts = {
+                "quiet": True, 
+                "no_warnings": True, 
+                "extract_flat": True, 
+                "socket_timeout": 6
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+                if info and "entries" in info:
+                    entries = list(info["entries"])
+                    if entries:
+                        video_url = entries[0].get("url") or entries[0].get("webpage_url")
+                        if video_url:
+                            return video_url
+        except Exception as e:
+            logger.warning("[TASK] yt-dlp video lookup failed for '%s': %s — falling back to search page", query, e)
+        # Graceful fallback — same behavior as before if lookup fails
         return f"https://www.youtube.com/results?search_query={quote(query, safe='')}"
 
     def _do_generate_image(self, payload: dict) -> Optional[tuple]:
