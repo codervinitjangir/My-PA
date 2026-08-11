@@ -1,6 +1,9 @@
 import asyncio
 import base64
 import io
+import os
+import subprocess
+import sys
 import tempfile
 import threading
 from PySide6.QtCore import QObject, Signal
@@ -8,6 +11,46 @@ from PIL import ImageGrab
 
 from jarvis_desktop.app.services.system_state import SystemState
 from jarvis_desktop.app.services.desktop_state import DesktopState
+
+
+class OrbManager:
+    """Manages the Ultron Orb Next.js dev server process lifecycle."""
+
+    def __init__(self):
+        self._process: subprocess.Popen | None = None
+        # Resolve the ultron-orb directory relative to this file's project root
+        self._orb_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "..", "..", "..", "ultron-orb"
+        )
+        self._orb_dir = os.path.normpath(self._orb_dir)
+
+    @property
+    def is_running(self) -> bool:
+        return self._process is not None and self._process.poll() is None
+
+    def start(self):
+        if self.is_running:
+            return
+        npm = "npm.cmd" if sys.platform == "win32" else "npm"
+        self._process = subprocess.Popen(
+            [npm, "run", "dev"],
+            cwd=self._orb_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+        )
+
+    def stop(self):
+        if not self.is_running:
+            return
+        if sys.platform == "win32":
+            subprocess.call(["taskkill", "/F", "/T", "/PID", str(self._process.pid)],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            self._process.terminate()
+        self._process = None
+
 
 class MainController(QObject):
     """
@@ -25,6 +68,7 @@ class MainController(QObject):
 
         self.is_listening = False
         self.tts_enabled = True
+        self.orb = OrbManager()   # Orb process manager — starts/stops on demand
 
         self._subscribe_state()
         self._connect_ui_signals()
@@ -41,6 +85,7 @@ class MainController(QObject):
         self.win.header.activity_toggled.connect(self.win.toggle_sidebar)
         self.win.header.settings_requested.connect(self.win.show_settings)
         self.win.header.new_chat_requested.connect(self._on_new_chat)
+        self.win.header.orb_toggled.connect(self._on_orb_toggled)   # NEW
         self.win.connectors_panel.mode_selected.connect(self.desk_state.set_current_mode)
 
         # Input Bar signals
@@ -275,3 +320,19 @@ class MainController(QObject):
         self.sys_state.set_voice_state("idle")
         print(f"[MainController Error]: {err_msg}")
         self.win.chat_panel.add_assistant_message(f"⚠️ Error: {err_msg}")
+
+    # ── Orb Toggle ────────────────────────────────────────────────────────────
+    def _on_orb_toggled(self):
+        """Start or stop the Ultron Orb Next.js dev server on demand."""
+        if self.orb.is_running:
+            self.orb.stop()
+            self.win.header.set_orb_state(False)
+            self.win.chat_panel.add_assistant_message(
+                "🌀 Ultron Orb stopped. RAM freed."
+            )
+        else:
+            self.orb.start()
+            self.win.header.set_orb_state(True)
+            self.win.chat_panel.add_assistant_message(
+                "🌀 Ultron Orb starting... open http://localhost:3000 in a moment."
+            )

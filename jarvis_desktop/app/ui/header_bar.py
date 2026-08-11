@@ -86,6 +86,7 @@ class HeaderBar(QFrame):
     activity_toggled = Signal()
     settings_requested = Signal()
     new_chat_requested = Signal()
+    orb_toggled = Signal()          # NEW: emitted when user clicks Orb button
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -210,6 +211,14 @@ class HeaderBar(QFrame):
         self.new_chat_btn = QPushButton("＋", self)
         self.new_chat_btn.setToolTip("New Chat")
 
+        # ── Orb Toggle Button ──────────────────────────────────────────────────
+        self.orb_btn = QPushButton("◉ Orb", self)
+        self.orb_btn.setToolTip("Start / Stop Ultron Orb (saves ~300MB RAM when off)")
+        self.orb_btn.setFixedHeight(36)
+        self.orb_btn.setCursor(Qt.PointingHandCursor)
+        self._orb_running = False
+        self._update_orb_btn_style()
+
         for icon_btn in [self.activity_btn, self.settings_btn, self.new_chat_btn]:
             icon_btn.setFixedSize(36, 36)
             icon_btn.setCursor(Qt.PointingHandCursor)
@@ -229,9 +238,12 @@ class HeaderBar(QFrame):
             """)
             right_layout.addWidget(icon_btn)
 
+        right_layout.addWidget(self.orb_btn)
+
         self.activity_btn.clicked.connect(self.activity_toggled.emit)
         self.settings_btn.clicked.connect(self.settings_requested.emit)
         self.new_chat_btn.clicked.connect(self.new_chat_requested.emit)
+        self.orb_btn.clicked.connect(self._on_orb_clicked)
 
         layout.addLayout(right_layout)
 
@@ -290,6 +302,51 @@ class HeaderBar(QFrame):
 
     def set_online_status(self, is_online: bool):
         self.set_system_status("online" if is_online else "offline")
+
+    # ── Orb Button Helpers ────────────────────────────────────────────────────
+    def _update_orb_btn_style(self):
+        if self._orb_running:
+            self.orb_btn.setText("◉ Orb  ON")
+            self.orb_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(124, 106, 239, 0.20);
+                    border: 1px solid rgba(124, 106, 239, 0.70);
+                    border-radius: 10px;
+                    color: #c9b8ff;
+                    font-size: 12px;
+                    font-weight: 600;
+                    padding: 0px 12px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(124, 106, 239, 0.35);
+                }
+            """)
+        else:
+            self.orb_btn.setText("◉ Orb")
+            self.orb_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(0, 217, 255, 0.04);
+                    border: 1px solid rgba(0, 217, 255, 0.10);
+                    border-radius: 10px;
+                    color: rgba(255, 255, 255, 0.55);
+                    font-size: 12px;
+                    font-weight: 500;
+                    padding: 0px 12px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(0, 217, 255, 0.10);
+                    border-color: rgba(0, 217, 255, 0.40);
+                    color: #00D9FF;
+                }
+            """)
+
+    def _on_orb_clicked(self):
+        self.orb_toggled.emit()
+
+    def set_orb_state(self, running: bool):
+        """Called by controller to sync button state with actual process state."""
+        self._orb_running = running
+        self._update_orb_btn_style()
 
 
 # ── Standalone Preview Test ───────────────────────────────────────────────────
