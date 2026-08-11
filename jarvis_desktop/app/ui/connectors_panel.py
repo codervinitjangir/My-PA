@@ -141,57 +141,11 @@ class ConnectorsPanel(QFrame):
         conn_scroll.setWidget(conn_widget)
         layout.addWidget(conn_scroll, 1)
 
-        # ── 4. LATENCY METRICS Section ──────────────────────────────────────────
-        layout.addSpacing(10)
-        
-        lat_header_row = QHBoxLayout()
-        lat_header = QLabel("LATENCY", self)
-        lat_header.setStyleSheet("font-size: 10px; font-weight: 800; color: #FFFFFF; letter-spacing: 1px;")
-        
-        self.lat_live_dot = QLabel("●", self)
-        self.lat_live_dot.setStyleSheet("font-size: 10px; color: #00E5CC;")
-        
-        lat_header_row.addWidget(lat_header)
-        lat_header_row.addStretch()
-        lat_header_row.addWidget(self.lat_live_dot)
-        layout.addLayout(lat_header_row)
-
-        lat_widget = QWidget()
-        lat_box = QVBoxLayout(lat_widget)
-        lat_box.setContentsMargins(0, 0, 0, 0)
-        lat_box.setSpacing(8)
-
         self.latency_labels = {}
-        latency_keys = [("Backend Ping", "ping"), ("Voice P50", "p50"), ("Voice P95", "p95"), ("Voice P99", "p99")]
+        # Latency UI moved to ChatPanel
         
-        for name, key in latency_keys:
-            row = QHBoxLayout()
-            c_lbl = QLabel(f"• {name}", lat_widget)
-            c_lbl.setStyleSheet("font-size: 11px; color: rgba(255, 255, 255, 0.7);")
-            
-            st_lbl = QLabel("-- ms", lat_widget)
-            st_lbl.setStyleSheet("font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.3);")
-            
-            row.addWidget(c_lbl)
-            row.addStretch()
-            row.addWidget(st_lbl)
-            lat_box.addLayout(row)
-            self.latency_labels[key] = st_lbl
-
-        layout.addWidget(lat_widget)
-
     def update_latency(self, data: dict):
-        for key, lbl in self.latency_labels.items():
-            if key in data:
-                val = data[key]
-                lbl.setText(f"{int(val)} ms" if isinstance(val, (int, float)) else str(val))
-                
-                # Color code
-                if isinstance(val, (int, float)):
-                    if val < 500: color = "#00E5CC" # Green
-                    elif val < 1500: color = "#F2A900" # Yellow
-                    else: color = "#FF3366" # Red
-                    lbl.setStyleSheet(f"font-size: 10px; font-weight: 700; color: {color};")
+        pass
 
 
     def _on_mode_click(self, mode_key: str):

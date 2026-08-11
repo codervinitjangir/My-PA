@@ -118,7 +118,7 @@ class MainController(QObject):
         self.backend.chat_chunk_received.connect(self._on_chat_chunk)
         self.backend.chat_response_received.connect(self._on_chat_response)
         self.backend.error_occurred.connect(self._on_error)
-        self.backend.latency_updated.connect(self.win.connectors_panel.update_latency)
+        self.backend.latency_updated.connect(self.win.chat_panel.update_latency)
 
     def _on_chat_chunk(self, chunk: str):
         """Append incoming streaming token chunk to chat stream"""

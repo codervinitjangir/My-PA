@@ -147,6 +147,25 @@ class ChatPanel(QFrame):
         self.scroll_area.setWidget(self.scroll_content)
         main_layout.addWidget(self.scroll_area, 1)
 
+        # ── 3. Latency Indicator ──────────────────────────────────────────────
+        self.latency_label = QLabel("AVG LATENCY: -- ms", self)
+        self.latency_label.setStyleSheet("font-size: 10px; font-weight: 700; color: rgba(0, 229, 204, 0.4); padding: 4px 12px;")
+        self.latency_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        main_layout.addWidget(self.latency_label, 0)
+
+    def update_latency(self, data: dict):
+        valid_vals = []
+        for key in ["p50", "p95", "p99", "ping"]:
+            val = data.get(key)
+            if isinstance(val, (int, float)) and val > 0:
+                valid_vals.append(val)
+        
+        if valid_vals:
+            avg = sum(valid_vals) / len(valid_vals)
+            self.latency_label.setText(f"AVG LATENCY: {int(avg)} ms")
+        else:
+            self.latency_label.setText("AVG LATENCY: -- ms")
+
     def add_user_message(self, text: str, timestamp: str = ""):
         if self.welcome_widget.isVisible():
             self.welcome_widget.hide()
