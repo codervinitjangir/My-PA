@@ -67,6 +67,7 @@ class MainController(QObject):
         self.desk_state = desktop_state or DesktopState(self)
 
         self.is_listening = False
+        self._one_shot_mic = False
         self.tts_enabled = True
         self.orb = OrbManager()   # Orb process manager — starts/stops on demand
 
@@ -92,6 +93,7 @@ class MainController(QObject):
         self.win.input_bar.cam_toggled.connect(self._on_camera_toggled)
         self.win.input_bar.mic_toggled.connect(self._on_mic_toggled)
         self.win.input_bar.tts_toggled.connect(self._on_tts_toggled)
+        self.win.input_bar.ptt_pressed.connect(self._on_ptt_pressed)
 
         # Also allow launching orb from the placeholder panel button
         self.win.orb_widget.launch_requested.connect(self._on_orb_toggled)
@@ -180,10 +182,16 @@ class MainController(QObject):
         finally:
             self.win.input_bar.set_cam_active(False)
 
+    def _on_ptt_pressed(self, is_down: bool):
+        if is_down and not self.is_listening:
+            self._one_shot_mic = True
+            self._on_mic_toggled()
+
     def _on_mic_toggled(self):
         """Toggle microphone audio recording for voice input"""
         if self.is_listening:
             self.is_listening = False
+            self._one_shot_mic = False
             self.win.input_bar.set_mic_active(False)
             self.sys_state.set_voice_state("idle")
         else:
@@ -237,6 +245,9 @@ class MainController(QObject):
 
     def _on_audio_recorded(self, wav_bytes: bytes):
         if wav_bytes:
+            if getattr(self, '_one_shot_mic', False) and self.is_listening:
+                self._on_mic_toggled()
+                
             asyncio.create_task(self._process_stt(wav_bytes))
         else:
             if not self.is_listening:

@@ -143,9 +143,9 @@ class InputBar(QFrame):
         return btn
 
     def _on_ptt(self, is_down: bool):
-        self.ptt_pressed.emit(is_down)
+        # We only care when it's pressed down to trigger a one-shot listening session
         if is_down:
-            self.mic_toggled.emit()
+            self.ptt_pressed.emit(True)
 
     def eventFilter(self, obj, event):
         if obj == self.text_input and event.type() == QEvent.KeyPress:
