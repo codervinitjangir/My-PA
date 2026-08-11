@@ -85,7 +85,6 @@ class MainController(QObject):
         self.win.header.activity_toggled.connect(self.win.toggle_sidebar)
         self.win.header.settings_requested.connect(self.win.show_settings)
         self.win.header.new_chat_requested.connect(self._on_new_chat)
-        self.win.header.orb_toggled.connect(self._on_orb_toggled)   # NEW
         self.win.connectors_panel.mode_selected.connect(self.desk_state.set_current_mode)
 
         # Input Bar signals
@@ -330,14 +329,12 @@ class MainController(QObject):
         if self.orb.is_running:
             self.orb.stop()
             self.win.orb_widget.hide_orb()
-            self.win.header.set_orb_state(False)
             self.win.chat_panel.add_assistant_message(
                 "🌀 Ultron Orb stopped. RAM freed."
             )
         else:
             self.orb.start()
             self.win.orb_widget.show_orb()
-            self.win.header.set_orb_state(True)
             self.win.chat_panel.add_assistant_message(
                 "🌀 Ultron Orb starting... open http://localhost:3000 in a moment."
             )
