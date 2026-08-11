@@ -21,7 +21,7 @@ class OrbManager:
         # Resolve the ultron-orb directory relative to this file's project root
         self._orb_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "..", "..", "..", "..", "ultron-orb"
+            "..", "..", "..", "ultron-orb"
         )
         self._orb_dir = os.path.normpath(self._orb_dir)
 
