@@ -95,6 +95,7 @@ class MainController(QObject):
 
         # Also allow launching orb from the placeholder panel button
         self.win.orb_widget.launch_requested.connect(self._on_orb_toggled)
+        self.win.orb_widget.close_requested.connect(self._on_orb_toggled)
 
         self.win.chat_panel.chip_clicked.connect(self._on_send_message)
         self.win.chat_panel.settings_requested.connect(self.win.show_settings)
