@@ -24,6 +24,7 @@ class StreamingTTSEngine(TTSEngine):
         self.voice = voice
         self.rate = rate
         self.pitch = pitch
+        self._eleven_client = None
 
     async def synthesize_sentence(self, sentence_text: str, voice: Optional[str] = None) -> AsyncIterator[bytes]:
         """Synthesize sentence string into streaming audio MP3/PCM bytes."""
@@ -36,10 +37,11 @@ class StreamingTTSEngine(TTSEngine):
         # ElevenLabs Fallback / Provider check
         if VOICE_PROVIDER == "elevenlabs" and ELEVENLABS_API_KEY:
             try:
-                from elevenlabs import Voice, VoiceSettings
-                from elevenlabs.client import ElevenLabs
-                client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-                audio_iter = client.generate(text=text, voice=ELEVENLABS_VOICE_ID, model="eleven_multilingual_v2")
+                if not self._eleven_client:
+                    from elevenlabs.client import ElevenLabs
+                    self._eleven_client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+                
+                audio_iter = self._eleven_client.generate(text=text, voice=ELEVENLABS_VOICE_ID, model="eleven_multilingual_v2")
                 for chunk in audio_iter:
                     if chunk:
                         yield chunk

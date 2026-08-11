@@ -617,7 +617,8 @@ class ChatService:
         self, 
         session_id: str, 
         user_message: str, 
-        imgbase64: Optional[str] = None
+        imgbase64: Optional[str] = None,
+        is_voice_mode: bool = False
     ) -> Iterator[Union[str, Dict[str, Any]]]:
         
         # Handle hidden camera bypass token from frontend
@@ -863,11 +864,13 @@ class ChatService:
             )
 
         executor = ThreadPoolExecutor(max_workers=2)
+        active_timeout = 1.5 if is_voice_mode else JARVIS_BRAIN_SEARCH_TIMEOUT
+        
         try:
             future_brain = executor.submit(_run_brain)
 
             try:
-                brain_res = future_brain.result(timeout=JARVIS_BRAIN_SEARCH_TIMEOUT)
+                brain_res = future_brain.result(timeout=active_timeout)
                 
                 if brain_res.get("intercepted"):
                     yield {"text": brain_res["result"]}
@@ -882,7 +885,7 @@ class ChatService:
             except FuturesTimeoutError:
                 logger.warning(
                     "[JARVIS] Brain classification timed out after %ds, defaulting to realtime", 
-                    JARVIS_BRAIN_SEARCH_TIMEOUT
+                    active_timeout
                 )
                 query_type, tasks, reasoning, brain_elapsed_ms, intent_dict = (
                     "realtime", [], "Brain timeout, defaulting to realtime", 0, {}
@@ -895,20 +898,20 @@ class ChatService:
                     "realtime", [], f"Brain crashed: {e}", 0, {}
                 )
 
-            if query_type in ("general", "casual_chat"):
+            if query_type in ("general", "casual_chat") or (is_voice_mode and query_type not in ("web", "search", "current_info")):
                 formatted_results, search_payload = "", None
 
             else:
                 try:
                     future_search = executor.submit(_run_search)
                     formatted_results, search_payload = future_search.result(
-                        timeout=JARVIS_BRAIN_SEARCH_TIMEOUT
+                        timeout=active_timeout
                     )
 
                 except FuturesTimeoutError:
                     logger.warning(
                         "[JARVIS] Web search prefetch timed out after %ds", 
-                        JARVIS_BRAIN_SEARCH_TIMEOUT
+                        active_timeout
                     )
                     formatted_results, search_payload = "", None
                 except Exception as e:

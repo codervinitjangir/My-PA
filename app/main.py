@@ -1139,8 +1139,9 @@ async def chat_jarvis_stream(chat_req: ChatRequest, request: Request):
     
     try:
         session_id = chat_service.get_or_create_session(chat_req.session_id)
+        is_voice = chat_req.is_voice_mode or bool(chat_req.session_id and chat_req.session_id.startswith("voice-"))
         chunk_iter = chat_service.process_jarvis_message_stream(
-            session_id, chat_req.message, imgbase64=chat_req.imgbase64
+            session_id, chat_req.message, imgbase64=chat_req.imgbase64, is_voice_mode=is_voice
         )
         
         return StreamingResponse(

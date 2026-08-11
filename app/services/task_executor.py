@@ -355,6 +355,10 @@ class TaskExecutor:
                             return video_url
         except Exception as e:
             logger.warning("[TASK] yt-dlp video lookup failed for '%s': %s — falling back to search page", query, e)
+            import traceback
+            with open("logs/ytdlp_error.txt", "w") as f:
+                f.write(f"Query: {query}\nError: {e}\nTraceback:\n{traceback.format_exc()}")
+                
         # Graceful fallback — same behavior as before if lookup fails
         return f"https://www.youtube.com/results?search_query={quote(query, safe='')}"
 

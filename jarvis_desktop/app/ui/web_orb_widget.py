@@ -142,12 +142,13 @@ class WebOrbWidget(QWidget):
     Wrapper for the Ultron Orb panel.
 
     - When orb is NOT running: shows a premium dark placeholder with a 'Launch Orb' button.
-    - When orb IS running: shows the live QWebEngineView at localhost:3000.
-    Exposes the same API (set_voice_state) as before.
+    - When orb IS running: waits smoothly for Next.js to boot, then fades to the 3D Orb.
+    - Features a floating 'Close Orb' button inside the active orb panel.
     """
 
-    # Forwarded signal so the controller can connect a single slot
+    # Forwarded signals so the controller can connect
     launch_requested = Signal()
+    close_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -165,15 +166,45 @@ class WebOrbWidget(QWidget):
 
         # Page 1 — Live Web View (created lazily on first launch)
         self._web_view: QWebEngineView | None = None
+        self._check_boot_timer: QTimer | None = None
+
+        # Floating Close Button (visible only when web view is active)
+        self._close_btn = QPushButton("✕ Close Orb", self)
+        self._close_btn.setFixedSize(120, 32)
+        self._close_btn.setCursor(Qt.PointingHandCursor)
+        self._close_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(124, 106, 239, 0.15);
+                border: 1px solid rgba(124, 106, 239, 0.35);
+                border-radius: 8px;
+                color: rgba(255, 255, 255, 0.65);
+                font-size: 12px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background: rgba(124, 106, 239, 0.40);
+                border-color: rgba(124, 106, 239, 0.85);
+                color: #ffffff;
+            }
+        """)
+        self._close_btn.clicked.connect(self.close_requested.emit)
+        self._close_btn.hide()
 
         self._voice_state = "online"
-        # Start on placeholder
         self._stack.setCurrentIndex(0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Position the close button floating in the top right corner
+        self._close_btn.move(self.width() - 140, 20)
 
     # ── Public API ──────────────────────────────────────────────────────────
 
     def show_orb(self):
-        """Switch to the live web view, creating it if needed."""
+        """Start the smooth boot sequence."""
+        self._placeholder.launch_btn.setText("Booting Hologram...")
+        self._placeholder.launch_btn.setEnabled(False)
+
         if self._web_view is None:
             self._web_view = QWebEngineView(self)
             self._web_view.page().setBackgroundColor(QColor(Qt.transparent))
@@ -186,14 +217,50 @@ class WebOrbWidget(QWidget):
             self._web_view.page().featurePermissionRequested.connect(
                 self._on_feature_permission
             )
+            self._web_view.loadFinished.connect(self._on_load_finished)
             self._stack.addWidget(self._web_view)
 
-        self._web_view.setUrl(QUrl("http://localhost:3000"))
-        self._stack.setCurrentWidget(self._web_view)
+        # Start a polling timer to try loading localhost until it actually succeeds
+        if self._check_boot_timer is None:
+            self._check_boot_timer = QTimer(self)
+            self._check_boot_timer.timeout.connect(self._try_load_url)
+        
+        self._check_boot_timer.start(1000)
+        self._try_load_url()
+
+    def _try_load_url(self):
+        if self._web_view is not None:
+            self._web_view.setUrl(QUrl("http://localhost:3000"))
+
+    def _on_load_finished(self, ok: bool):
+        # Only switch the UI if it loaded successfully AND it's our orb url
+        if ok and "localhost:3000" in self._web_view.url().toString():
+            if self._check_boot_timer:
+                self._check_boot_timer.stop()
+            
+            # Smooth swap — we are ready!
+            self._stack.setCurrentWidget(self._web_view)
+            self._close_btn.show()
+            self._close_btn.raise_()
+            
+            # Reset placeholder button for next time
+            self._placeholder.launch_btn.setText("  ◉  Launch Orb")
+            self._placeholder.launch_btn.setEnabled(True)
+
+            # Re-apply current voice state to the new web view
+            self.set_voice_state(self._voice_state)
 
     def hide_orb(self):
-        """Switch back to the placeholder."""
+        """Immediately switch back to placeholder and kill web view CPU usage."""
+        if self._check_boot_timer:
+            self._check_boot_timer.stop()
+
         self._stack.setCurrentWidget(self._placeholder)
+        self._close_btn.hide()
+        
+        self._placeholder.launch_btn.setText("  ◉  Launch Orb")
+        self._placeholder.launch_btn.setEnabled(True)
+
         # Blank the web view to stop it consuming CPU/GPU
         if self._web_view is not None:
             self._web_view.setUrl(QUrl("about:blank"))
@@ -212,3 +279,4 @@ class WebOrbWidget(QWidget):
             self._web_view.page().setFeaturePermission(
                 url, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
             )
+

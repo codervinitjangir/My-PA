@@ -4,7 +4,6 @@ import io
 import os
 import subprocess
 import sys
-import tempfile
 import threading
 from PySide6.QtCore import QObject, Signal
 from PIL import ImageGrab
@@ -144,7 +143,7 @@ class MainController(QObject):
         self.win.chat_panel.clear_messages()
         self.win.sidebar.clear_flow()
 
-    def _on_send_message(self, text: str):
+    def _on_send_message(self, text: str, is_voice: bool = False):
         self._current_assistant_bubble = None
 
         # Add user message bubble
@@ -159,7 +158,7 @@ class MainController(QObject):
         self.sys_state.set_voice_state("thinking")
 
         # Dispatch async streaming HTTP request for instant token response (<500ms)
-        asyncio.create_task(self.backend.stream_chat_message(text, self.desk_state.current_mode))
+        asyncio.create_task(self.backend.stream_chat_message(text, self.desk_state.current_mode, is_voice=is_voice))
 
     def _on_camera_toggled(self):
         """Capture screen screenshot and dispatch to vision brain"""
@@ -212,8 +211,8 @@ class MainController(QObject):
             CHANNELS = 1
             CHUNK_DURATION = 0.1
             CHUNK_SAMPLES = int(CHUNK_DURATION * RATE)
-            SILENCE_LIMIT = 0.8  # seconds of silence to mark end of sentence
-            ENERGY_THRESHOLD = 50  # Lowered from 200 to catch quieter mics
+            SILENCE_LIMIT = 0.6  # seconds of silence to mark end of sentence
+            ENERGY_THRESHOLD = 50  # Lowered threshold to accommodate quiet microphones
 
             while self.is_listening:
                 audio_buffer = []
@@ -221,7 +220,6 @@ class MainController(QObject):
                 has_spoken = False
 
                 while self.is_listening:
-                    # Do not record while Jarvis is thinking or speaking (prevents echoing itself in continuous mode)
                     if self.sys_state.voice_state not in ("listening", "idle"):
                         has_spoken = False
                         silence_timer = 0.0
@@ -284,7 +282,7 @@ class MainController(QObject):
     async def _process_stt(self, wav_bytes: bytes):
         text = await self.backend.transcribe_audio(wav_bytes)
         if text:
-            self._on_send_message(text)
+            self._on_send_message(text, is_voice=True)
         else:
             self.sys_state.set_voice_state("idle")
 
@@ -330,16 +328,14 @@ class MainController(QObject):
 
             audio_bytes = await self.backend.synthesize_speech(clean_text)
             if audio_bytes:
-                import os, tempfile
-                fd, temp_path = tempfile.mkstemp(suffix=".mp3")
-                os.write(fd, audio_bytes)
-                os.close(fd)  # Close file descriptor so Windows releases file lock
-
+                import io
                 import pygame
+                
                 if not pygame.mixer.get_init():
                     pygame.mixer.init()
 
-                pygame.mixer.music.load(temp_path)
+                audio_stream = io.BytesIO(audio_bytes)
+                pygame.mixer.music.load(audio_stream)
                 pygame.mixer.music.play()
         except Exception as e:
             print(f"[TTS Playback Error]: {e}")

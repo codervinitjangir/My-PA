@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     tts: bool = False
     imgbase64: Optional[str] = None
+    is_voice_mode: bool = False
 
 class ChatResponse(BaseModel):
     response: str

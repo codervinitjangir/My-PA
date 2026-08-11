@@ -317,7 +317,7 @@ export function useSpeech(onTranscriptReceived?: (text: string) => void) {
               mediaRecorderRef.current.stop();
             }
             stopListeningInternal(true); // stop recording tracks
-          }, 1200); // 1200ms of silence triggers capture, matching script.js
+          }, 750); // 750ms of silence triggers capture, matching script.js
         }
       }
       vadRAFRef.current = requestAnimationFrame(checkSilence);

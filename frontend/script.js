@@ -458,7 +458,7 @@ function monitorVAD() {
                         mediaRecorder.stop();
                     }
                     stopListeningInternal();
-                }, 1500); // 1.5s silence cutoff for tight responsive turns
+                }, 750); // 750ms silence cutoff for tight responsive turns
             }
         }
         vadRAF = requestAnimationFrame(checkSilence);

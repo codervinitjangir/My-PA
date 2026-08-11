@@ -124,12 +124,12 @@ class BackendService(QObject):
             print(f"[BackendService] Chat error: {e}")
             self.error_occurred.emit(f"Chat error: {str(e)}")
 
-    async def stream_chat_message(self, text: str, mode: str = "jarvis"):
+    async def stream_chat_message(self, text: str, mode: str = "jarvis", is_voice: bool = False):
         """Stream real-time token response token-by-token from /chat/jarvis/stream"""
         import time
         self.last_activity = time.time()
         try:
-            payload = {"message": text, "mode": mode}
+            payload = {"message": text, "mode": mode, "is_voice_mode": is_voice}
             endpoint = "/chat/jarvis/stream" if mode == "jarvis" else "/chat/stream"
 
             async with self.client.stream("POST", endpoint, json=payload) as response:
@@ -247,9 +247,10 @@ class BackendService(QObject):
                 json_data = resp.json()
                 pct = json_data.get("percentiles", {})
                 if pct:
-                    data["p50"] = pct.get("p50", 0)
-                    data["p95"] = pct.get("p95", 0)
-                    data["p99"] = pct.get("p99", 0)
+                    ttfa_pct = pct.get("ttfa_ms", {})
+                    data["p50"] = ttfa_pct.get("P50", 0)
+                    data["p95"] = ttfa_pct.get("P95", 0)
+                    data["p99"] = ttfa_pct.get("P99", 0)
             
             self.latency_updated.emit(data)
         except Exception:

@@ -19,6 +19,7 @@ from app.core.voice.action_planner import DesktopActionPlanner
 from app.core.voice.stt_engine import GroqSTTEngine
 from app.core.voice.tts_engine import StreamingTTSEngine
 from app.utils.sentence_chunker import SentenceChunker
+from app.core.voice.latency_tracker import VoiceMetricsRecord, latency_tracker
 
 logger = logging.getLogger("J.A.R.V.I.S")
 
@@ -55,7 +56,6 @@ class UnifiedVoicePipeline(VoicePipeline):
         audio_buffer = bytearray()
         
         current_llm_task: Optional[asyncio.Task] = None
-        current_tts_task: Optional[asyncio.Task] = None
 
         logger.info("[VOICE-WS] Session started: %s", session_id)
 
@@ -107,11 +107,9 @@ class UnifiedVoicePipeline(VoicePipeline):
                         await websocket.send_json({"event": "ready", "status": "listening"})
 
                     elif event_type == "barge_in":
-                        logger.info("[VOICE-WS] Barge-in event received! Halting ongoing TTS & LLM tasks.")
+                        logger.info("[VOICE-WS] Barge-in event received! Halting ongoing LLM task.")
                         if current_llm_task and not current_llm_task.done():
                             current_llm_task.cancel()
-                        if current_tts_task and not current_tts_task.done():
-                            current_tts_task.cancel()
                         audio_buffer.clear()
                         vad.reset()
                         await websocket.send_json({"event": "audio_stop"})
@@ -125,76 +123,111 @@ class UnifiedVoicePipeline(VoicePipeline):
     async def _run_voice_turn(self, websocket: Any, session_id: str, audio_bytes: bytes):
         """Run single voice turn pipeline (STT -> Intent -> Action / LLM -> Sentence TTS)."""
         t_start = time.perf_counter()
+        metrics = VoiceMetricsRecord(session_id=session_id)
         
-        # 1. STT Transcription
-        stt_res = await self.stt_engine.transcribe_final(audio_bytes)
-        text = (stt_res.get("text") or "").strip()
-        
-        if not text:
-            logger.info("[VOICE-WS] STT produced no text.")
-            await websocket.send_json({"event": "stt_empty"})
-            return
-
-        stt_ms = int((time.perf_counter() - t_start) * 1000)
-        logger.info("[VOICE-WS] STT Transcript in %dms: '%s'", stt_ms, text)
-        await websocket.send_json({"event": "stt_result", "text": text, "stt_ms": stt_ms})
-
-        # 2. Fast-Path Intent Classification
-        intent = await self.intent_engine.classify_intent(text)
-        logger.info("[VOICE-WS] Intent classified: type=%s action=%s confidence=%.2f",
-                    intent.intent_type, intent.action, intent.confidence)
-
-        # 3. High-Confidence Action Execution (~100ms post-STT)
-        if intent.confidence >= 0.85 and intent.intent_type == "action":
-            action_res = await self.action_planner.execute_action(intent)
-            action_ms = int((time.perf_counter() - t_start) * 1000)
-            logger.info("[VOICE-WS] Desktop action executed in %dms!", action_ms)
-            await websocket.send_json({"event": "action_executed", "action": intent.action, "elapsed_ms": action_ms})
+        try:
+            # 1. STT Transcription
+            stt_res = await self.stt_engine.transcribe_final(audio_bytes)
+            text = (stt_res.get("text") or "").strip()
             
-            # Synthesize short voice confirmation
-            speak_msg = f"Opening {intent.target}." if intent.action == "open_app" else "Done, sir."
-            async for chunk in self.tts_engine.synthesize_sentence(speak_msg):
-                b64_audio = base64.b64encode(chunk).decode("utf-8")
-                await websocket.send_json({"event": "audio_chunk", "data": b64_audio})
-            return
+            stt_ms = int((time.perf_counter() - t_start) * 1000)
+            metrics.stt_rtt_ms = stt_ms
+            
+            if not text:
+                logger.info("[VOICE-WS] STT produced no text.")
+                await websocket.send_json({"event": "stt_empty"})
+                return
 
-        # 4. LLM Generation + Sentence-Level TTS Streaming
-        if not self.chat_service:
-            return
+            logger.info("[VOICE-WS] STT Transcript in %dms: '%s'", stt_ms, text)
+            await websocket.send_json({"event": "stt_result", "text": text, "stt_ms": stt_ms})
 
-        sentence_chunker = SentenceChunker()
-        t_llm_start = time.perf_counter()
-        first_audio_sent = False
+            # 2. Fast-Path Intent Classification
+            t_intent = time.perf_counter()
+            intent = await self.intent_engine.classify_intent(text)
+            metrics.intent_latency_ms = int((time.perf_counter() - t_intent) * 1000)
+            logger.info("[VOICE-WS] Intent classified: type=%s action=%s confidence=%.2f",
+                        intent.intent_type, intent.action, intent.confidence)
 
-        try:
-            # Parallel Context Retrieval Timeout Budget (50ms)
-            ctx_task = asyncio.create_task(asyncio.sleep(0.01))  # Lightweight context placeholder
-            await asyncio.wait_for(ctx_task, timeout=0.05)
-        except asyncio.TimeoutError:
-            pass
+            if intent.confidence >= 0.85 and intent.intent_type == "action":
+                action_res = await self.action_planner.execute_action(intent)
+                action_ms = int((time.perf_counter() - t_start) * 1000)
+                metrics.desktop_action_latency_ms = action_ms
+                logger.info("[VOICE-WS] Desktop action executed in %dms!", action_ms)
+                await websocket.send_json({"event": "action_executed", "action": intent.action, "elapsed_ms": action_ms})
+                
+                # Synthesize short voice confirmation
+                speak_msg = f"Opening {intent.target}." if intent.action == "open_app" else "Done, sir."
+                first_action_audio = False
+                t_tts_start = time.perf_counter()
+                async for chunk in self.tts_engine.synthesize_sentence(speak_msg):
+                    if not first_action_audio:
+                        metrics.ttfa_ms = int((time.perf_counter() - t_start) * 1000)
+                        metrics.tts_first_byte_ms = int((time.perf_counter() - t_tts_start) * 1000)
+                        first_action_audio = True
+                    b64_audio = base64.b64encode(chunk).decode("utf-8")
+                    await websocket.send_json({"event": "audio_chunk", "data": b64_audio})
+                return
 
-        # Stream tokens from ChatService
-        try:
-            token_iter = self.chat_service.process_message_stream(session_id, text)
-            for token in token_iter:
+            # 4. LLM Generation + Sentence-Level TTS Streaming
+            if not self.chat_service:
+                return
+
+            sentence_chunker = SentenceChunker(min_clause_words=3, max_clause_words=14)
+            t_llm_start = time.perf_counter()
+            first_audio_sent = False
+            first_token_received = False
+            try:
+                # Parallel Context Retrieval Timeout Budget (50ms)
+                ctx_task = asyncio.create_task(asyncio.sleep(0.01))  # Lightweight context placeholder
+                await asyncio.wait_for(ctx_task, timeout=0.05)
+            except asyncio.TimeoutError:
+                pass
+
+            # Stream tokens from ChatService (wrapper to prevent blocking asyncio loop)
+            token_iter = self.chat_service.process_jarvis_message_stream(session_id, text, is_voice_mode=True)
+            
+            async def async_gen(sync_iter):
+                loop = asyncio.get_running_loop()
+                while True:
+                    try:
+                        # Fetch the next token from the synchronous generator in a thread pool
+                        yield await loop.run_in_executor(None, next, sync_iter)
+                    except StopIteration:
+                        break
+
+            async for token in async_gen(token_iter):
                 if isinstance(token, dict):
                     continue
                     
+                if not first_token_received:
+                    metrics.llm_first_token_ms = int((time.perf_counter() - t_llm_start) * 1000)
+                    first_token_received = True
+                
                 sentences = sentence_chunker.process_token(token)
                 for sentence in sentences:
                     # Synthesize sentence #1 immediately
+                    t_tts_start = time.perf_counter()
                     async for audio_chunk in self.tts_engine.synthesize_sentence(sentence):
                         if not first_audio_sent:
                             ttfa_ms = int((time.perf_counter() - t_start) * 1000)
+                            metrics.ttfa_ms = ttfa_ms
+                            metrics.tts_first_byte_ms = int((time.perf_counter() - t_tts_start) * 1000)
                             logger.info("[VOICE-WS] TIME-TO-FIRST-AUDIO (TTFA): %dms!", ttfa_ms)
                             first_audio_sent = True
-                            
+                        
                         b64_audio = base64.b64encode(audio_chunk).decode("utf-8")
                         await websocket.send_json({"event": "audio_chunk", "data": b64_audio, "text": sentence})
 
             # Flush remaining sentence
             for final_sentence in sentence_chunker.flush():
+                t_tts_start = time.perf_counter()
                 async for audio_chunk in self.tts_engine.synthesize_sentence(final_sentence):
+                    if not first_audio_sent:
+                        ttfa_ms = int((time.perf_counter() - t_start) * 1000)
+                        metrics.ttfa_ms = ttfa_ms
+                        metrics.tts_first_byte_ms = int((time.perf_counter() - t_tts_start) * 1000)
+                        logger.info("[VOICE-WS] TIME-TO-FIRST-AUDIO (TTFA): %dms!", ttfa_ms)
+                        first_audio_sent = True
                     b64_audio = base64.b64encode(audio_chunk).decode("utf-8")
                     await websocket.send_json({"event": "audio_chunk", "data": b64_audio, "text": final_sentence})
 
@@ -202,7 +235,12 @@ class UnifiedVoicePipeline(VoicePipeline):
 
         except asyncio.CancelledError:
             logger.info("[VOICE-WS] Turn cancelled by barge-in or new input.")
+            raise
         except Exception as e:
             logger.error("[VOICE-WS] Pipeline error: %s", e)
+
+        finally:
+            metrics.total_interaction_time_ms = int((time.perf_counter() - t_start) * 1000)
+            latency_tracker.record_interaction(metrics)
 
 import numpy as np
