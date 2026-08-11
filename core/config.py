@@ -124,7 +124,7 @@ class Settings:
     output_device: str | None = None
     always_on_mic: bool = True
     device: str = "auto"
-    voice: str = "en_US-norman-medium"
+    voice: str = "en_GB-cori-high"
     speech_speed: float = 1.0
     silence_ms: int = 800
     vad_threshold: float = 0.5
