@@ -78,6 +78,7 @@ class MainController(QObject):
         """Observe SystemState and DesktopState changes to update UI widgets reactively"""
         self.sys_state.backend_status_changed.connect(self._on_connection_status_changed)
         self.sys_state.voice_state_changed.connect(self._on_voice_state_changed)
+        self.desk_state.current_mode_changed.connect(self._on_mode_changed)
 
     def _connect_ui_signals(self):
         # Header & Connectors signals
@@ -93,6 +94,7 @@ class MainController(QObject):
         self.win.input_bar.mic_toggled.connect(self._on_mic_toggled)
         self.win.input_bar.tts_toggled.connect(self._on_tts_toggled)
         self.win.input_bar.ptt_pressed.connect(self._on_ptt_pressed)
+        self.win.input_bar.voice_mode_stop_requested.connect(self._on_voice_mode_stop)
 
         # Also allow launching orb from the placeholder panel button
         self.win.orb_widget.launch_requested.connect(self._on_orb_toggled)
@@ -199,6 +201,42 @@ class MainController(QObject):
             self.sys_state.set_voice_state("listening")
             threading.Thread(target=self._record_and_transcribe, daemon=True).start()
 
+    # ── Hands-Free Voice Mode ──────────────────────────────────────────────────
+    def _on_mode_changed(self, mode: str):
+        """React when user selects a mode in the connectors sidebar."""
+        if mode == "voice":
+            self._start_hands_free_listening()
+        else:
+            self._stop_hands_free_listening()
+
+    def _start_hands_free_listening(self):
+        """Start continuous (hands-free) mic listening. Loops automatically after each utterance."""
+        if self.is_listening:
+            return
+        self._one_shot_mic = False
+        self.is_listening = True
+        self.win.input_bar.set_mic_active(True)
+        self.win.input_bar.set_voice_mode_active(True)
+        self.win.connectors_panel.set_active_mode("voice")
+        self.sys_state.set_voice_state("listening")
+        threading.Thread(target=self._record_and_transcribe, daemon=True).start()
+
+    def _stop_hands_free_listening(self):
+        """Stop continuous listening and restore PTT mode."""
+        self.is_listening = False
+        self._one_shot_mic = False
+        self.win.input_bar.set_mic_active(False)
+        self.win.input_bar.set_voice_mode_active(False)
+        self.sys_state.set_voice_state("idle")
+
+    def _on_voice_mode_stop(self):
+        """User clicked the '🔴 STOP LISTENING' button — exit hands-free mode."""
+        self._stop_hands_free_listening()
+        # Revert desk state and sidebar highlight to 'text'
+        self.desk_state.set_current_mode("text")
+        self.win.connectors_panel.set_active_mode("text")
+
+
     def _record_and_transcribe(self):
         """Record audio dynamically using VAD to minimize latency"""
         try:
@@ -286,13 +324,17 @@ class MainController(QObject):
 
     def _on_audio_recorded(self, wav_bytes: bytes):
         if wav_bytes:
+            # One-shot PTT: stop listening immediately after capture
             if getattr(self, '_one_shot_mic', False) and self.is_listening:
                 self._on_mic_toggled()
-                
+
             asyncio.create_task(self._process_stt(wav_bytes))
         else:
             if not self.is_listening:
                 self.sys_state.set_voice_state("idle")
+            elif self.desk_state.current_mode == "voice":
+                # Empty/silent recording in hands-free mode — stay in Listening state
+                self.sys_state.set_voice_state("listening")
 
     async def _process_stt(self, wav_bytes: bytes):
         text = await self.backend.transcribe_audio(wav_bytes)
@@ -307,8 +349,13 @@ class MainController(QObject):
         self.win.input_bar.set_tts_enabled(self.tts_enabled)
 
     def _on_chat_response(self, data: dict):
-        self.sys_state.set_voice_state("idle")
         self.sys_state.set_backend_status("online")
+
+        # In hands-free voice mode, return to listening after each response
+        if self.desk_state.current_mode == "voice" and self.is_listening:
+            self.sys_state.set_voice_state("listening")
+        else:
+            self.sys_state.set_voice_state("idle")
 
         response_text = data.get("response", "")
         flow = data.get("flow", [])

@@ -16,6 +16,7 @@ class InputBar(QFrame):
     cam_toggled    = Signal()
     tts_toggled    = Signal()
     ptt_pressed    = Signal(bool)
+    voice_mode_stop_requested = Signal()  # emitted when user clicks Stop in hands-free mode
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -225,7 +226,65 @@ class InputBar(QFrame):
                 }
             """)
 
-# ── Standalone Preview ────────────────────────────────────────────────────────
+    def set_voice_mode_active(self, active: bool):
+        """
+        Switch the PTT button between:
+          active=True  → '🔴 STOP LISTENING' (click to stop hands-free mode)
+          active=False → '⭕ HOLD TO TALK'   (press/release for one-shot PTT)
+        """
+        # Safely disconnect all PTT-related signals before rewiring
+        for sig in (self.ptt_btn.pressed, self.ptt_btn.released, self.ptt_btn.clicked):
+            try:
+                sig.disconnect()
+            except RuntimeError:
+                pass
+
+        if active:
+            self.ptt_btn.setText("🔴  STOP LISTENING")
+            self.ptt_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 60, 60, 0.35);
+                    border: 2px solid #ff3c3c;
+                    border-radius: 10px;
+                    color: #ffffff;
+                    font-size: 11px;
+                    font-weight: 700;
+                    letter-spacing: 0.8px;
+                    padding: 8px 16px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 60, 60, 0.55);
+                    border-color: #ff5050;
+                }
+            """)
+            self.ptt_btn.clicked.connect(self.voice_mode_stop_requested.emit)
+        else:
+            self.ptt_btn.setText("⭕  HOLD TO TALK")
+            self.ptt_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 60, 60, 0.10);
+                    border: 1.5px solid #ff3c3c;
+                    border-radius: 10px;
+                    color: #ff6b6b;
+                    font-size: 11px;
+                    font-weight: 700;
+                    letter-spacing: 0.8px;
+                    padding: 8px 16px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 60, 60, 0.25);
+                    border-color: #ff5050;
+                    color: #ffffff;
+                }
+                QPushButton:pressed {
+                    background-color: rgba(255, 60, 60, 0.50);
+                    color: #ffffff;
+                }
+            """)
+            self.ptt_btn.pressed.connect(lambda: self._on_ptt(True))
+            self.ptt_btn.released.connect(lambda: self._on_ptt(False))
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = QWidget()

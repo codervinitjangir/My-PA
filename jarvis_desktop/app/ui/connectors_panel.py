@@ -92,6 +92,9 @@ class ConnectorsPanel(QFrame):
             self.mode_btns[key] = btn
             layout.addWidget(btn)
 
+        # Highlight the initial default (no mode active on start)
+        self._active_mode_key: str | None = None
+
         # ── 3. CONNECTORS Section ─────────────────────────────────────────────
         conn_header_row = QHBoxLayout()
         conn_header = QLabel("CONNECTORS", self)
@@ -148,7 +151,34 @@ class ConnectorsPanel(QFrame):
         pass
 
 
+    def set_active_mode(self, mode_key: str | None):
+        """Visually highlight the active mode button; pass None to deactivate all."""
+        self._active_mode_key = mode_key
+        _ACTIVE_SS = """
+            QPushButton {
+                background-color: rgba(0, 229, 204, 0.15);
+                border: 1.5px solid #00E5CC;
+                border-radius: 8px;
+                text-align: left;
+            }
+        """
+        _IDLE_SS = """
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 8px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 229, 204, 0.12);
+                border-color: #00E5CC;
+            }
+        """
+        for key, btn in self.mode_btns.items():
+            btn.setStyleSheet(_ACTIVE_SS if key == mode_key else _IDLE_SS)
+
     def _on_mode_click(self, mode_key: str):
+        self.set_active_mode(mode_key)
         self.mode_selected.emit(mode_key)
 
 # ── Standalone Preview Test ──────────────────────────────────────────────────
