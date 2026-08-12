@@ -258,10 +258,13 @@ class MainController(QObject):
                 noise_rec = sd.rec(int(1 * RATE), samplerate=RATE, channels=CHANNELS, dtype=np.int16)
                 sd.wait()
                 room_noise_energy = np.sqrt(np.mean(noise_rec.astype(np.float64)**2))
-                ENERGY_THRESHOLD = max(room_noise_energy * 3, 50)
-                print(f"[Mic] Calibration complete. Room noise: {room_noise_energy:.2f}. Threshold set to: {ENERGY_THRESHOLD:.2f}")
+                # Use 2x noise as threshold, floor of 25, hard ceiling of 60
+                # so a quiet laptop mic can still trigger on normal speech
+                ENERGY_THRESHOLD = min(max(room_noise_energy * 2, 25), 60)
+                print(f"[Mic] Room noise: {room_noise_energy:.2f} -> Threshold: {ENERGY_THRESHOLD:.2f}")
             except Exception as e:
-                print(f"[Mic] Calibration failed: {e}. Using default threshold.")
+                ENERGY_THRESHOLD = 30
+                print(f"[Mic] Calibration failed: {e}. Defaulting to 30.")
             # ------------------------------
 
             while self.is_listening:
@@ -341,7 +344,11 @@ class MainController(QObject):
         if text:
             self._on_send_message(text, is_voice=True)
         else:
-            self.sys_state.set_voice_state("idle")
+            # In voice mode, don't go idle — return to listening so the loop continues
+            if self.desk_state.current_mode == "voice" and self.is_listening:
+                self.sys_state.set_voice_state("listening")
+            else:
+                self.sys_state.set_voice_state("idle")
 
     def _on_tts_toggled(self):
         """Toggle assistant voice synthesis output"""
