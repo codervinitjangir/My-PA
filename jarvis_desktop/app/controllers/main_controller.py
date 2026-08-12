@@ -214,6 +214,18 @@ class MainController(QObject):
             SILENCE_LIMIT = 0.6  # seconds of silence to mark end of sentence
             ENERGY_THRESHOLD = 50  # Lowered threshold to accommodate quiet microphones
 
+            # --- ADAPTIVE CALIBRATION ---
+            print("[Mic] Calibrating room noise for 1 second...")
+            try:
+                noise_rec = sd.rec(int(1 * RATE), samplerate=RATE, channels=CHANNELS, dtype=np.int16)
+                sd.wait()
+                room_noise_energy = np.sqrt(np.mean(noise_rec.astype(np.float64)**2))
+                ENERGY_THRESHOLD = max(room_noise_energy * 3, 50)
+                print(f"[Mic] Calibration complete. Room noise: {room_noise_energy:.2f}. Threshold set to: {ENERGY_THRESHOLD:.2f}")
+            except Exception as e:
+                print(f"[Mic] Calibration failed: {e}. Using default threshold.")
+            # ------------------------------
+
             while self.is_listening:
                 audio_buffer = []
                 silence_timer = 0.0
@@ -234,6 +246,9 @@ class MainController(QObject):
                         break
 
                     energy = np.sqrt(np.mean(recording.astype(np.float64)**2))
+
+                    # Temporary energy logging
+                    print(f"[Mic Energy] {energy:.2f} (Threshold: {ENERGY_THRESHOLD:.2f})")
 
                     if energy > ENERGY_THRESHOLD:
                         has_spoken = True

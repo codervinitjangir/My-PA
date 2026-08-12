@@ -336,6 +336,8 @@ export function useSpeech(onTranscriptReceived?: (text: string) => void) {
       silenceTimerRef.current = null;
     }
 
+    const willFireOnStop = sendAudio && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording';
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       if (!sendAudio) {
         // Discard chunks by overriding handler
@@ -355,8 +357,10 @@ export function useSpeech(onTranscriptReceived?: (text: string) => void) {
     }
 
     setIsListening(false);
-    isSpeakingRef.current = false;
-    setIsSpeaking(false);
+    if (!willFireOnStop) {
+      isSpeakingRef.current = false;
+      setIsSpeaking(false);
+    }
     setSpeechWidget(false);
     setIsOrbActive(ttsPlayerInstance.isCurrentlyPlaying());
   };
