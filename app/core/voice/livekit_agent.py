@@ -44,7 +44,7 @@ class JarvisLiveKitAgent:
     def __init__(self):
         # We use Gemini 2.5 Flash for reasoning (very fast)
         self.llm_plugin = lk_google.LLM(
-            model="gemini-2.5-flash", 
+            model="gemini-2.0-flash",
             api_key=os.getenv("GEMINI_API_KEY")
         )
         

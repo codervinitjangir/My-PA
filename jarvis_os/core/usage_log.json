@@ -1,5 +1,5 @@
 {
-  "dashboard_open": 1478,
+  "dashboard_open": 1501,
   "morning_brief": 14,
   "screen_analysis": 6,
   "session_resume": 0,
@@ -104,7 +104,10 @@
       "dashboard_open": 137
     },
     "2026-08-12": {
-      "dashboard_open": 19
+      "dashboard_open": 37
+    },
+    "2026-08-16": {
+      "dashboard_open": 5
     }
   },
   "web_open": 0,
